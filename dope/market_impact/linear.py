@@ -29,6 +29,10 @@ class LinearMktImpactModel:
       
     return self.slopes[(0,0)]
   
+  def impact(self, level, delta):
+    slope = self.get_slope(level)
+    return slope * delta
+  
   def fit(self, kinks=None, should_plot=False):
     self.slopes = {}
     # Example data
