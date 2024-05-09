@@ -7,12 +7,12 @@ class Llama:
     self.pools = None
     self.data = None
     self.borrow_lend_data = None
-  
+
   def get_pools(self):
     url = "https://yields.llama.fi/pools"
     self.pools = pd.DataFrame(requests.get(url).json()["data"])
     return self.pools
-  
+
   def lend_rate(self, pool_id):
       url = f"https://yields.llama.fi/chart/{pool_id}"
       result = requests.get(url)
