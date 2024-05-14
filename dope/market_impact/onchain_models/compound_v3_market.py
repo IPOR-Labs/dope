@@ -62,7 +62,7 @@ class CompoundV3Market:
       excess_utilization_rate = utilization_rate - self.borrow_kink
       return (excess_utilization_rate * self.borrow_per_second_interest_rate_slope_high // (10 ** 18)) + normal_rate
 
-  def rates(self) -> Rates:
+  def rates(self) -> CompoundV3Rates:
     utilization_rate = self.total_borrows * (10 ** 18) // self.total_supply
     borrow_rate_per_second = self.calculate_compound_v3_borrow_rate(utilization_rate)
     supply_rate_per_second = self.calculate_compound_v3_supply_rate(utilization_rate)
