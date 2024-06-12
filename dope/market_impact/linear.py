@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from collections import defaultdict
 
+def zero_func(*args, **kwargs):
+  return 0
 
 class LinearMktImpactModel:
   def __init__(self, utilization_rate, apy):
@@ -13,7 +15,7 @@ class LinearMktImpactModel:
   @classmethod
   def zero_instance(cls):
     model = cls([],[])
-    model.slopes = defaultdict(lambda: 0)
+    model.slopes = defaultdict(zero_func)
     return model
 
   def set_data_ref(self, data_ref):
@@ -37,22 +39,83 @@ class LinearMktImpactModel:
       
     return self.slopes[(0,0)]
   
+  def impact_simple(self, timestamp, capital, is_borrow):
+    """
+    is_borrow is a boolean that is true if the borrow rate should be used. otherwise use lend/supply rate.
+    """
+
+    _filter = self.data_ref.index <= timestamp
+    row = self.data_ref[_filter].iloc[-1]
+    ur0 = row.utilizationRate
+    #totalSupplyUsd	totalBorrowUsd
+    tvl_name = "totalBorrowUsd" if is_borrow else "totalSupplyUsd"
+
+    if is_borrow:
+      ur = (row["totalBorrowUsd"] + capital)/(row["totalSupplyUsd"])
+    else:
+      ur = row["totalBorrowUsd"]/(capital + row["totalSupplyUsd"])
+
+    slope = self.get_slope(ur0)
+    
+    # the following line cancels out the bias (we do not keep the bias)
+    impact = slope * (ur - ur0)
+    
+    return impact
+  
   def impact(self, timestamp, capital, is_borrow):
     """
     is_borrow is a boolean that is true if the borrow rate should be used. otherwise use lend/supply rate.
     """
-    side_name = "apyBaseBorrow" if is_borrow else "apyBase"
+
     _filter = self.data_ref.index <= timestamp
     row = self.data_ref[_filter].iloc[-1]
-    level = row.utilizationRate
+    ur0 = row.utilizationRate
     #totalSupplyUsd	totalBorrowUsd
     tvl_name = "totalBorrowUsd" if is_borrow else "totalSupplyUsd"
-    delta = capital/row[tvl_name]
 
-    slope = self.get_slope(level)
-    # impacts= self.strategy.capital/df[_filter].totalSupplyUsd.iloc[-1] * slopes[mkt]
+    if is_borrow:
+      ur1 = (row["totalBorrowUsd"] + capital)/(row["totalSupplyUsd"])
+    else:
+      ur1 = row["totalBorrowUsd"]/(capital + row["totalSupplyUsd"])
+
+    # N.B.: assumption that intervals are ordered
+    intervals = self.slopes.keys()
     
-    return slope * delta
+    is_counting = False
+    deltas = {}
+    ur_left = min(ur0, ur1)
+    ur_right = max(ur0, ur1)
+    for (left, right) in intervals:
+      
+      if (left <= ur_left < right) and (left <= ur_right < right):
+        # same interval
+        deltas[(left, right)] = ur_left - ur_right
+        break
+      
+      if left <= ur_left < right:
+        deltas[(left, right)] = ur_left - right
+        is_counting = True
+      elif left <= ur0 < right:
+        # got to initial ur interval
+        deltas[(left, right)] = left - ur_right
+        is_counting = False # stop counting
+      elif is_counting:
+        # between ur1 and ur0
+        deltas[(left, right)] = left - right
+      else:
+        # done conting or not yeat conting
+        deltas[(left, right)] = 0
+    #print(ur1, ur0)
+    #print(ur_left, ur_right)
+    #print(deltas)
+    #print([self.slopes[(left, right)] * deltas[(left, right)] for (left, right) in deltas.keys()])
+    impact = sum([self.slopes[(left, right)] * deltas[(left, right)] for (left, right) in deltas.keys()])
+    sign = 1 if ur1 < ur0 else -1
+    #print(f"sign: {sign}")
+    # # the following line cancels out the bias (we do not keep the bias)
+    # impact = slope * (ur - ur0)
+    
+    return sign * impact
   
   def fit(self, kinks=None, should_plot=False):
     self.slopes = {}

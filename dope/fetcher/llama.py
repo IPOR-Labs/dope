@@ -14,29 +14,32 @@ class Llama:
     return self.pools
 
   def lend_rate(self, pool_id):
-      url = f"https://yields.llama.fi/chart/{pool_id}"
-      result = requests.get(url)
-      data = pd.DataFrame(result.json()["data"])
-      # this line make sure all dates are at midnight
-      data["datetime"] = pd.to_datetime(data.timestamp).apply(lambda x:x.date())
-      # this gets back to datetime for rolling
-      data["datetime"] = pd.to_datetime(data["datetime"])
-      
-      data = data.set_index("datetime")
-      
-      return data
+    url = f"https://yields.llama.fi/chart/{pool_id}"
+    result = requests.get(url)
+    data = pd.DataFrame(result.json()["data"])
+    # this line make sure all dates are at midnight
+    data["datetime"] = pd.to_datetime(data.timestamp).apply(lambda x:x.date())
+    # this gets back to datetime for rolling
+    data["datetime"] = pd.to_datetime(data["datetime"])
+    
+    data = data.set_index("datetime")
+    
+    return data
   
   def borrow_lend(self, pool_id):
     url = f"https://yields.llama.fi/chartLendBorrow/{pool_id}"
     result = requests.get(url)
     df = pd.DataFrame(result.json()["data"])
     # this line make sure all dates are at midnight
-    df["utilizationRate"] = df["totalBorrowUsd"]/df["totalSupplyUsd"]
     df["datetime"] = pd.to_datetime(df.timestamp).apply(lambda d:d.date())
     # this gets back to datetime for rolling
     df["datetime"] = pd.to_datetime(df["datetime"])
     df = df.set_index("datetime")
-    
+
+    df["totalBorrowUsd"] = df["totalBorrowUsd"].interpolate(method='linear')
+    df["totalSupplyUsd"] = df["totalSupplyUsd"].interpolate(method='linear')
+    df["utilizationRate"] = df["totalBorrowUsd"]/df["totalSupplyUsd"]
+
     return df
   
   def load_data_for_asset(
@@ -69,7 +72,7 @@ class Llama:
       borrow_lend_data[_name] = borrow_lend_data[_name][_filter]
       data[_name] = self.lend_rate(row.pool)
       data[_name] = data[_name][data[_name].index >= start_period]
-      print(_name, len(data[_name]), len(borrow_lend_data[_name]))
+      print(_name, row.pool, len(data[_name]), len(borrow_lend_data[_name]))
       
       data[_name]["utilizationRate"] = borrow_lend_data[_name]["utilizationRate"].fillna(0.5)
     self.data = data

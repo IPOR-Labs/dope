@@ -9,4 +9,4 @@ class BaseAgent:
 
   @property
   def data(self):
-    return self.engine.data
+    return self.engine.borrow_lend_data
