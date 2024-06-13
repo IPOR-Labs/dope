@@ -2,11 +2,12 @@ import pandas as pd
 from dope.backengine.estimators.baseestimator import BaseEstimator
 
 class Trigger:
-  def __init__(self, df, lag, est, protocolList=[]):
+  def __init__(self, df, lag, est, rt_col,  protocolList=[]):
     self.df = df
     self.lag = lag
     self.est = est
     self.protocolList = protocolList
+    self.rt_col = rt_col
     
   def pairs(self):
     protocols = [x[1] for x in list(self.df.columns)]
@@ -16,8 +17,8 @@ class Trigger:
     return [(protocols[i],protocols[j]) for i in range(0,N) for j in range(i+1,N)]
     
   def dates(self):
-    mu = self.est.rolling_fit_mu(df=self.df, lag=self.lag, rt_col="apyBaseBorrow") # could equivalently use 'supplyRate' or borrowRate'
-    sigma = self.est.rolling_fit_sigma(df=self.df, lag=self.lag, rt_col="apyBaseBorrow") # identify which column to use for calculating triggers
+    mu = self.est.rolling_fit_mu(df=self.df, lag=self.lag, rt_col=self.rt_col) # could equivalently use 'supplyRate' or borrowRate'
+    sigma = self.est.rolling_fit_sigma(df=self.df, lag=self.lag, rt_col=self.rt_col) # identify which column to use for calculating triggers
     k = 0.5
     t_dn = (mu - k*sigma).dropna()
     t_up = (mu + k*sigma).dropna()
