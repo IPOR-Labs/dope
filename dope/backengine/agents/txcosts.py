@@ -58,7 +58,7 @@ class LenderMIQP(BaseAgent):
     df = pd.concat(self.data[self.token], names=["datetime"]).unstack(level=0)[rate_column]
     #del df["cash"]
     df = df[df.index <= date_ix]
-    mean_filter = df.index >= date_ix - pd.Timedelta(f"{self.mean_window}D")
+    mean_filter = df.index > date_ix - pd.Timedelta(f"{self.mean_window}D")
     cov_filter = df.index >= date_ix - pd.Timedelta(f"{self.cov_window}D")
     if len(df) == 0:
       return None
@@ -124,6 +124,30 @@ class LenderMIQP(BaseAgent):
   
     return np.array(deposit_cost)
     #return np.ones(n) *  deposit_cost
+  
+  def get_initial_guess(self, date_ix):
+    np.random.seed(42)
+    keys = self.data[self.token].keys()
+    def get_r(ws):
+      r = 0
+      for mkt, w in ws[self.token].items():
+          impact = self.engine.mkt_impact[mkt].impact(date_ix, self.capital*w, is_borrow=False)
+          r += w*(self.data[self.token][mkt].apyBase.loc[date_ix]+impact)
+      return r
+    rows = []
+    LEN = len(keys)
+    for _ in range(300):
+      _ws = [np.random.rand(1)[0] for _ in range(LEN)]
+      _sum = sum(_ws)
+      _ws = [w/_sum for w in _ws]
+      ws = {self.token:dict(zip(keys, _ws))}
+      rows.append( (*_ws, get_r(ws)))
+    df = pd.DataFrame(rows)
+    r_column = df.columns[-1]
+    df[df[r_column]==df[r_column].max()]
+    ws = df[df[r_column] == df[r_column].max()].values[0,:-1]
+    return ws
+      
 
   def optimum_allocation(self, opt_params, date_ix, prec=None):
     """
@@ -136,8 +160,12 @@ class LenderMIQP(BaseAgent):
     r = self.opt_params.mus
     Q = self.opt_params.cov
     CAP = self.opt_params.capital if self.opt_params.capital > 0 else self.capital
+    CAP = self.capital
 
     w0 = np.zeros(num_assets)
+    #w0 = np.array([0, 0.8, 0, 0.2, 0])
+    #w0 = np.array([0.496243,	0.091117,	0.018177,	0.39058,	0.003883])
+    w0 = self.get_initial_guess(date_ix)
 
 
     fplus = np.array([10/CAP, 50/CAP, 0])  # Gas fees
@@ -154,17 +182,17 @@ class LenderMIQP(BaseAgent):
         cp = []
         cm = []
         for ix in range(len(mkts)):
-          cp.append(self.engine.mkt_impact[mkts[ix]].impact(date_ix, capital=CAP*wplus[ix], is_borrow=True))
-          cm.append(self.engine.mkt_impact[mkts[ix]].impact(date_ix, capital=CAP*wminus[ix], is_borrow=True))
+          cp.append(self.engine.mkt_impact[mkts[ix]].impact(date_ix, capital=CAP*wplus[ix], is_borrow=False))
+          cm.append(self.engine.mkt_impact[mkts[ix]].impact(date_ix, capital=-CAP*wminus[ix], is_borrow=False))
 
-        cm = np.array(cm)/100
-        cp = np.array(cp)/100
+        cm = np.array(cm)#/100
+        cp = np.array(cp)#/100
         result = (
             
             + w.T @ (
               r
-              - cp
-              + cm
+              + cp #cp is negative when is_borrow=False, hence the inverted sign
+              - cm # cm is negative when is_borrow=False, hence the inverted sign
             )
         )
         if np.abs(self.risk_aversion) > 0.01:
@@ -233,6 +261,12 @@ class LenderMIQP(BaseAgent):
 
     ]
 
+    options = {
+      'ftol': 1e-9,    # Custom precision goal
+      'maxiter': 200,  # Custom maximum number of iterations
+      'eps': 1e-3      # Custom step size for numerical approximation
+    }
+
 
     best_result = minimize(
         f,
@@ -240,21 +274,24 @@ class LenderMIQP(BaseAgent):
         args=(Q, r), 
         constraints=constraints, 
         bounds=bounds, 
-        method='SLSQP'
+        method='SLSQP',
+        options=options,
     )
+    self.result = best_result
     # Get the optimal parameters
     if best_result is not None:
         optimal_params = best_result.x
         w_opt = optimal_params[:num_assets]
         #wplus_opt = optimal_params[num_assets:2*num_assets]
         #wminus_opt = optimal_params[2*num_assets:3*num_assets]
-
+        #print(wplus_opt)
+        #print(wminus_opt)
         # print("Optimal parameters:")
         # print("w0", w0)
         # print("w =", w_opt)
-        # print("wplus =", wplus_opt)
-        # print("wminus =", wminus_opt)
-        # print("E[r]", -best_result.fun)
+        #print("wplus =", wplus_opt)
+        #print("wminus =", wminus_opt)
+        #print("E[r]", -best_result.fun)
     else:
         # print("No valid solution found.")
         return []

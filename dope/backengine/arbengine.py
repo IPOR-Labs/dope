@@ -58,9 +58,16 @@ class ArbBacktester:
   def get_capital(self, token):
     return self.πs[token].capital()
 
-  def __call__(self):
-    end_timestamp = pd.to_datetime("2023-12-08")
-    start_timestamp = pd.to_datetime("2023-12-07")
+  def __call__(self, start_timestamp=None, end_timestamp=None):
+    if start_timestamp is not None:
+      start_timestamp = pd.to_datetime(start_timestamp)
+    else:
+      start_timestamp = pd.to_datetime("2000-01-01")
+    if end_timestamp is not None:
+      end_timestamp = pd.to_datetime(end_timestamp)
+    else:
+      end_timestamp = pd.to_datetime("2100-01-01")
+    
     self.strategy.register_engine(self)
     rows = []
     Ws = []
@@ -72,11 +79,12 @@ class ArbBacktester:
         print(f"{i:>10,}/{_days:>10,}", end="\r")
       date_prev = self.dates[i]
       date_now = self.dates[i+1]
-      
-      # if date_now < start_timestamp:
-      #   continue
-      #if date_now >= end_timestamp:
-      # break
+
+      if date_now < start_timestamp:
+        continue
+      if date_now >= end_timestamp:
+        break
+
       #print(date_now)
       # The agent does not know the future.
       #print(date_now)
@@ -100,7 +108,8 @@ class ArbBacktester:
           side_name = "apyBase" if capital >= 0	else "apyBaseBorrow"
           if mkt == "cash":
             assert side_name != "apyBaseBorrow", "Cannot Borrow from own wallet."
-          impacts[mkt] = self.mkt_impact[mkt].impact(date_now, capital, is_borrow=False)
+            
+          impacts[mkt] = self.mkt_impact[mkt].impact(date_now, π.allocation.get(mkt, 0), is_borrow=False)
           r_breakdown[mkt] = max(0, df[_filter][side_name].iloc[-1] + sign * impacts[mkt])
 
 
