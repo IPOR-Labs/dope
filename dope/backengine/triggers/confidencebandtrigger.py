@@ -1,7 +1,8 @@
 import pandas as pd
 from dope.backengine.estimators.baseestimator import BaseEstimator
+from dope.backengine.triggers.basetrigger import BaseTrigger
 
-class Trigger:
+class ConfidenceBandTrigger(BaseTrigger):
   def __init__(self, df, lag, est, rt_col,  protocolList=[]):
     self.df = df
     self.lag = lag
