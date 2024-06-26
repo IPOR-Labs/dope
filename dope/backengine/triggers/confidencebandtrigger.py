@@ -18,14 +18,17 @@ class ConfidenceBandTrigger(BaseTrigger):
     return [(protocols[i],protocols[j]) for i in range(0,N) for j in range(i+1,N)]
     
   def dates(self):
-    mu = self.est.rolling_fit_mu(df=self.df, lag=self.lag, rt_col=self.rt_col) # could equivalently use 'supplyRate' or borrowRate'
-    sigma = self.est.rolling_fit_sigma(df=self.df, lag=self.lag, rt_col=self.rt_col) # identify which column to use for calculating triggers
+    _df = self.df[[self.rt_col]
+    mu = self.est.rolling_fit_mu(df=_df, lag=self.lag, rt_col=self.rt_col) # could equivalently use 'supplyRate' or borrowRate'
+    sigma = self.est.rolling_fit_sigma(df=_df, lag=self.lag, rt_col=self.rt_col) # identify which column to use for calculating triggers
     k = 0.5
-    t_dn = (mu - k*sigma).dropna()
-    t_up = (mu + k*sigma).dropna()
+    t_dn = (mu - k*sigma)
+    t_up = (mu + k*sigma)
     _filter = pd.Series(index=pd.Index([],dtype=int), dtype=bool) # initialise to empty
     for pair in self.pairs():
       asset1, asset2 = pair[0], pair[1]
+      if t_dn[asset1].notnull().sum()==0 or t_dn[asset2].notnull().sum()==0:
+        continue
       t = t_dn.copy().rename(columns={asset1: asset1+'_dn', asset2: asset2+'_dn'})
       t[asset1+'_up'] = t_up[asset1]
       t[asset2+'_up'] = t_up[asset2]
