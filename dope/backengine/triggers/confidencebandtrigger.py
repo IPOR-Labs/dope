@@ -18,7 +18,7 @@ class ConfidenceBandTrigger(BaseTrigger):
     return [(protocols[i],protocols[j]) for i in range(0,N) for j in range(i+1,N)]
     
   def dates(self):
-    _df = self.df[[self.rt_col]
+    _df = self.df[[self.rt_col]]
     mu = self.est.rolling_fit_mu(df=_df, lag=self.lag, rt_col=self.rt_col) # could equivalently use 'supplyRate' or borrowRate'
     sigma = self.est.rolling_fit_sigma(df=_df, lag=self.lag, rt_col=self.rt_col) # identify which column to use for calculating triggers
     k = 0.5
