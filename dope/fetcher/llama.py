@@ -21,11 +21,9 @@ class Llama:
     data["datetime"] = pd.to_datetime(data.timestamp).apply(lambda x:x.date())
     # this gets back to datetime for rolling
     data["datetime"] = pd.to_datetime(data["datetime"])
-    
     data = data.set_index("datetime")
-    
     return data
-  
+
   def borrow_lend(self, pool_id):
     url = f"https://yields.llama.fi/chartLendBorrow/{pool_id}"
     result = requests.get(url)
@@ -58,14 +56,16 @@ class Llama:
     poolids = self.pools[self.pools.symbol == asset].sort_values("tvlUsd", ascending=False)#[:20]
     poolids = poolids[poolids.tvlUsd >= tvl_cut]
     poolids = poolids[poolids.chain == chain_name]
-    poolids
-    
+    return self.load_data_from_pool_ids(poolids, start_period)
+  
+  def load_data_from_pool_ids(self, poolids, start_period):
+  
     #start_period = pd.to_datetime("2023-06-01")
     start_period = pd.to_datetime(start_period)
     data = {}
     borrow_lend_data = {}
     for _, row in poolids.iterrows():
-      _name = row.project+":"+row.symbol
+      _name = row.chain+":"+row.project+":"+row.symbol
       print(_name, end="\r")
       borrow_lend_data[_name] = self.borrow_lend(row.pool)
       _filter = borrow_lend_data[_name].index >= start_period

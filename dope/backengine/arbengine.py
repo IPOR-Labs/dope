@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 
 
@@ -12,6 +13,7 @@ class TokenPortfolio:
   def compound(self, protocol_rate_dict, dt):
     for protocol, rate in protocol_rate_dict.items():
       if protocol in self.allocation:
+        #print("C::: ",protocol, self.allocation[protocol],  (1 + rate/100*dt), self.allocation[protocol] * (1 + rate/100*dt))
         self.allocation[protocol] = self.allocation[protocol] * (1 + rate/100*dt)
   
   def capital(self):
@@ -32,6 +34,12 @@ class TokenPortfolio:
     
     for protocol, weight in new_weights.items():
       self.allocation[protocol] = weight * _capital
+    
+    # remove the ones not allocated anymore (in case zero weights disapear)
+    for protocol in list(self.allocation.keys()):
+      if protocol not in new_weights:
+        self.allocation[protocol] = 0
+    
 
 class ArbBacktester:
 
@@ -58,6 +66,15 @@ class ArbBacktester:
   def get_capital(self, token):
     return self.πs[token].capital()
 
+
+  def prep(self):
+    self.strategy.register_engine(self)
+    
+    self.data.add_cash_mkt()
+    for _token in self.data.keys():
+      for mkt in self.data[_token].keys():
+        self.mkt_impact[mkt].set_data_ref(self.data[_token][mkt])
+
   def __call__(self, start_timestamp=None, end_timestamp=None):
     if start_timestamp is not None:
       start_timestamp = pd.to_datetime(start_timestamp)
@@ -68,7 +85,8 @@ class ArbBacktester:
     else:
       end_timestamp = pd.to_datetime("2100-01-01")
     
-    self.strategy.register_engine(self)
+    self.prep() # register data, slippage model, strategy 
+
     rows = []
     Ws = []
     _days = len(self.dates)
@@ -84,6 +102,7 @@ class ArbBacktester:
         continue
       if date_now >= end_timestamp:
         break
+      #print("@", date_now)
 
       #print(date_now)
       # The agent does not know the future.
@@ -105,19 +124,26 @@ class ArbBacktester:
           if len(df[_filter]) == 0:
             continue
           sign = 1 if capital >= 0 else -1
-          side_name = "apyBase" if capital >= 0	else "apyBaseBorrow"
+          # side_name = "apyBase" if capital >= 0	else "apyBaseBorrow"
+          side_name = "apyBase"
           if mkt == "cash":
             assert side_name != "apyBaseBorrow", "Cannot Borrow from own wallet."
             
           impacts[mkt] = self.mkt_impact[mkt].impact(date_now, π.allocation.get(mkt, 0), is_borrow=False)
-          r_breakdown[mkt] = max(0, df[_filter][side_name].iloc[-1] + sign * impacts[mkt])
+          _rate = df[_filter][side_name].iloc[-1] + sign * impacts[mkt]
+          if not np.isfinite(_rate):
+            continue
+          # r_breakdown[mkt] = max(0, _rate)
+          r_breakdown[mkt] = _rate
 
 
         π.compound(r_breakdown, dt=(date_now - date_prev).total_seconds()/365/24/3600)
         for mkt in r_breakdown.keys():
           r_breakdown[mkt] = ws_before.get(mkt, 0) * r_breakdown[mkt]
         if len(π)>0:
-          timestamp = df[_filter].timestamp.iloc[-1]
+          if len(df[_filter]) == 0: 
+            continue
+          timestamp = df[_filter].index[-1]
           rows.append([date_now, timestamp, {token:π.weights()}, sum(r_breakdown.values()), π.capital(), r_breakdown, slopes, impacts])
           Ws.append([date_now, timestamp, self.strategy.token, {token:ws_before}, π.capital()])
     
@@ -127,11 +153,14 @@ class ArbBacktester:
       
       # step 3: Rebalance
       for token, _ws in ws.items():
+        #print(">", self.πs[token].allocation)
         if len(self.πs[token]) ==0:
           self.πs[token].rebalance(_ws, self.strategy.capital)
         else:
           self.πs[token].rebalance(_ws, None)
+        #print("<", self.πs[token].allocation)
       
+      #print()
       #print("π:::::",π.allocation)
     strategy = pd.DataFrame(rows, columns=["datetime", "timestamp", "ws", "rate", "capital", "breakdown", "slope", "mkt_impact"])
     strategy = strategy.set_index("datetime")

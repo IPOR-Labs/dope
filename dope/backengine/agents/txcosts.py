@@ -63,6 +63,12 @@ class LenderMIQP(BaseAgent):
     if len(df) == 0:
       return None
     
+    mus = df[mean_filter].mean()
+    
+    valid_cols = list(mus[np.isfinite(mus)].index)
+    df = df[valid_cols]
+    
+    
     if self.vol_type == VolType.down:
       cov = np.matrix(df[cov_filter].diff().clip(upper=0).cumsum().cov())
     elif self.vol_type == VolType.up:
@@ -132,7 +138,13 @@ class LenderMIQP(BaseAgent):
       r = 0
       for mkt, w in ws[self.token].items():
           impact = self.engine.mkt_impact[mkt].impact(date_ix, self.capital*w, is_borrow=False)
-          r += w*(self.data[self.token][mkt].apyBase.loc[date_ix]+impact)
+          _filter = self.data[self.token][mkt].apyBase.index <= date_ix
+          tmp = self.data[self.token][mkt][_filter]
+          if len(tmp) == 0:
+            continue
+          _rate = tmp.apyBase.iloc[-1]
+          if np.isfinite(_rate):
+            r += w*(_rate+impact)
       return r
     rows = []
     LEN = len(keys)
@@ -143,7 +155,7 @@ class LenderMIQP(BaseAgent):
       ws = {self.token:dict(zip(keys, _ws))}
       rows.append( (*_ws, get_r(ws)))
     df = pd.DataFrame(rows)
-    r_column = df.columns[-1]
+    r_column = self.opt_params.columns
     df[df[r_column]==df[r_column].max()]
     ws = df[df[r_column] == df[r_column].max()].values[0,:-1]
     return ws

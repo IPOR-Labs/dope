@@ -30,7 +30,7 @@ class LenderQuadraticParams:
 
 class LenderMKTETF(BaseAgent):
 
-  def __init__(self, token, capital, time_window=7, triggers=None):
+  def __init__(self, token, capital, time_window=7, triggers=None, verbose=True):
     """
     Mixed Integer Quadratic Programming Agent
     """
@@ -41,6 +41,7 @@ class LenderMKTETF(BaseAgent):
     self.time_window = int(time_window)
     self.triggers = triggers
     self.ws = {}
+    self.verbose = verbose
     
     self.rate_column = "apyBase"
   
@@ -55,7 +56,8 @@ class LenderMKTETF(BaseAgent):
     if self.triggers is not None:
       if date_ix not in self.triggers:
         return self.ws
-    print("Acting....", date_ix)
+    if self.verbose:
+      print("Acting....", date_ix)
     
     
     run_data = self.engine.data
@@ -67,5 +69,6 @@ class LenderMKTETF(BaseAgent):
     columns = [c for c in columns if "cash" not in c]
     tmp = tmp.totalSupplyUsd[columns].rolling(f"{self.time_window}D").mean()
     _sum = tmp.sum(axis=1)
-    self.ws = {self.token: {k:v for k,v in zip(columns,(tmp.iloc[-1]/_sum.iloc[-1]))}}
+    #print(_sum.iloc[-1], "<<< SUM", "tmp.iloc[-1]", tmp.iloc[-1])
+    self.ws = {self.token: {k:v for k,v in zip(columns,(tmp.iloc[-1]/_sum.iloc[-1])) if np.isfinite(v)}}
     return self.ws

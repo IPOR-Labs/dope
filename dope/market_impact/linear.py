@@ -5,6 +5,17 @@ from collections import defaultdict
 def zero_func(*args, **kwargs):
   return 0
 
+
+class ZeroLinearMktImpactModel:
+  def __(self, *args, **kwargs):
+    pass
+  
+  def impact(self,*args, **kwargs):
+    return 0
+  
+  def set_data_ref(self, *args, **kwargs):
+    pass
+
 class LinearMktImpactModel:
   def __init__(self, utilization_rate, apy):
     self.x = utilization_rate
@@ -14,7 +25,7 @@ class LinearMktImpactModel:
   
   @classmethod
   def zero_instance(cls):
-    model = cls([],[])
+    model = ZeroLinearMktImpactModel()
     model.slopes = defaultdict(zero_func)
     return model
 

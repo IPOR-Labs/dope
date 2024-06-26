@@ -18,10 +18,21 @@ class Backtester:
     dates.sort()
     return dates
   
+  def prep(self):
+    print("perp?")
+    self.lender.register_engine(self)
+    
+    self.data.add_cash_mkt()
+    for _token in self.data.keys():
+      for mkt in self.data[_token].keys():
+        self.mkt_impact[mkt].set_data_ref(self.data[_token][mkt])
+  
   def __call__(self):
     end_timestamp = pd.to_datetime("2023-07-23")
     start_timestamp = pd.to_datetime("2023-07-15")
-    self.lender.register_engine(self)
+    
+    self.prep() # register data, slippage model, strategy 
+    
     rows = []
     for i in range(20, len(self.dates[:])-1):
       date_prev = self.dates[i]
