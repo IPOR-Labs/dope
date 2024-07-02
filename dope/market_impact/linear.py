@@ -70,7 +70,7 @@ class LinearMktImpactModel:
     
     # the following line cancels out the bias (we do not keep the bias)
     impact = slope * (ur - ur0)
-    
+
     return impact
   
   def impact(self, timestamp, capital, is_borrow):
@@ -80,7 +80,7 @@ class LinearMktImpactModel:
 
     _filter = self.data_ref.index <= timestamp
     row = self.data_ref[_filter].iloc[-1]
-    ur0 = row.utilizationRate
+    #ur0 = row.utilizationRate
     #totalSupplyUsd	totalBorrowUsd
     tvl_name = "totalBorrowUsd" if is_borrow else "totalSupplyUsd"
 
@@ -88,6 +88,7 @@ class LinearMktImpactModel:
       ur1 = (row["totalBorrowUsd"] + capital)/(row["totalSupplyUsd"])
     else:
       ur1 = row["totalBorrowUsd"]/(capital + row["totalSupplyUsd"])
+    ur0 = row["totalBorrowUsd"]/(row["totalSupplyUsd"])
 
     # N.B.: assumption that intervals are ordered
     intervals = self.slopes.keys()
@@ -116,10 +117,11 @@ class LinearMktImpactModel:
       else:
         # done conting or not yeat conting
         deltas[(left, right)] = 0
-    #print(ur1, ur0)
-    #print(ur_left, ur_right)
-    #print(deltas)
-    #print([self.slopes[(left, right)] * deltas[(left, right)] for (left, right) in deltas.keys()])
+    # print(ur1, ur0)
+    # print(ur_left, ur_right)
+    # print(deltas)
+    # print(self.slopes)
+    # print([self.slopes[(left, right)] * deltas[(left, right)] for (left, right) in deltas.keys()])
     impact = sum([self.slopes[(left, right)] * deltas[(left, right)] for (left, right) in deltas.keys()])
     sign = 1 if ur1 < ur0 else -1
     #print(f"sign: {sign}")
@@ -155,6 +157,7 @@ class LinearMktImpactModel:
       slope, bias = 0, 0  
     else:
       slope, bias = np.polyfit(x, y, 1)
+      #print(slope, bias)
     # Plot the data and the line
     if should_plot:
       self.plot(x,y, slope, bias)

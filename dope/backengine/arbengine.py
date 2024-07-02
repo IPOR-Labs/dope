@@ -111,7 +111,6 @@ class ArbBacktester:
       # Step 1: Position gets Accrued:
       for token, π in self.πs.items():
         r_breakdown = {}
-        slopes = {}
         impacts = {}
         if len(π) > 0:
           ws_before = π.weights()
@@ -123,18 +122,21 @@ class ArbBacktester:
           _filter = df.index <= date_now
           if len(df[_filter]) == 0:
             continue
-          sign = 1 if capital >= 0 else -1
-          # side_name = "apyBase" if capital >= 0	else "apyBaseBorrow"
-          side_name = "apyBase"
+          is_borrow = capital < 0
+          #side_name = "apyBase" if capital >= 0	else "apyBaseBorrow"
+          side_name = "apyBaseBorrow" if is_borrow else "apyBase"
           if mkt == "cash":
             assert side_name != "apyBaseBorrow", "Cannot Borrow from own wallet."
             
-          impacts[mkt] = self.mkt_impact[mkt].impact(date_now, π.allocation.get(mkt, 0), is_borrow=False)
-          _rate = df[_filter][side_name].iloc[-1] + sign * impacts[mkt]
+          impacts[mkt] = self.mkt_impact[mkt].impact(date_now, π.allocation.get(mkt, 0), is_borrow=is_borrow)
+          #_rate_now = df[_filter][side_name].iloc[-1]
+          
+          _rate = df[_filter][side_name].iloc[-1] + impacts[mkt]
           if not np.isfinite(_rate):
             continue
-          # r_breakdown[mkt] = max(0, _rate)
+          #print(mkt,"_rate", _rate, df[_filter][side_name].iloc[-1], impacts[mkt], π.allocation.get(mkt, 0) )
           r_breakdown[mkt] = _rate
+          
 
 
         π.compound(r_breakdown, dt=(date_now - date_prev).total_seconds()/365/24/3600)
@@ -144,7 +146,7 @@ class ArbBacktester:
           if len(df[_filter]) == 0: 
             continue
           timestamp = df[_filter].index[-1]
-          rows.append([date_now, timestamp, {token:π.weights()}, sum(r_breakdown.values()), π.capital(), r_breakdown, slopes, impacts])
+          rows.append([date_now, timestamp, {token:π.weights()}, sum(r_breakdown.values()), π.capital(), r_breakdown, impacts])
           Ws.append([date_now, timestamp, self.strategy.token, {token:ws_before}, π.capital()])
     
       # Step 2: Strategy Acts
@@ -162,7 +164,7 @@ class ArbBacktester:
       
       #print()
       #print("π:::::",π.allocation)
-    strategy = pd.DataFrame(rows, columns=["datetime", "timestamp", "ws", "rate", "capital", "breakdown", "slope", "mkt_impact"])
+    strategy = pd.DataFrame(rows, columns=["datetime", "timestamp", "ws", "rate", "capital", "breakdown", "mkt_impact"])
     strategy = strategy.set_index("datetime")
     self.summary = strategy
     self.Ws = pd.DataFrame(Ws, columns=["datetime", "timestamp", "token", "ws", "capital"])

@@ -117,37 +117,6 @@ class BacktestData:
     return cls(token_mkt_data)
 
 
-@dataclass
-class BacktestSummary:
-  summary:  dict[str, pd.DataFrame]
-  
-  def dump(self, filename, folderpath= pathlib.Path().home() / "s3/fusion/backtest-data"):
-    pathlib.Path(folderpath / filename).mkdir(parents=True, exist_ok=True)
-    for token, data in self.summary.items():
-      for mkt, df in data.items():
-        df.to_csv(folderpath / filename / f"{token}_{mkt}.csv")
-  
-  @classmethod
-  def load(cls, filename, folderpath= pathlib.Path().home() / "s3/fusion/backtest-data"):
-    summary = {}
-    for file in pathlib.Path(folderpath / filename).iterdir():
-      strategy_name = file.name
-      summary[strategy_name] = pd.read_csv(strategy_name, index_col=0)
-      summary[strategy_name].index = pd.to_datetime(summary[strategy_name].index)
-    return cls(summary)
-
-  def __getitem__(self, key):
-    return self.summary[key]
-
-  def keys(self):
-    return self.summary.keys()
-
-  def items(self):
-    return self.summary.items()
-
-  def to_block(self):
-    return pd.concat(self.summary, names=["datetime"]).unstack(level=0)
-
 class DataLoader:
 
   @classmethod
