@@ -65,7 +65,12 @@ class Llama:
     data = {}
     borrow_lend_data = {}
     for _, row in poolids.iterrows():
-      _name = row.chain+":"+row.project+":"+row.symbol
+      _meta = row.poolMeta
+      if _meta is not None: 
+        _meta = f"({_meta})"
+      else:
+        _meta = ""
+      _name = row.chain+":"+row.project+f"{_meta}"+":"+row.symbol
       print(_name, end="\r")
       borrow_lend_data[_name] = self.borrow_lend(row.pool)
       _filter = borrow_lend_data[_name].index >= start_period
