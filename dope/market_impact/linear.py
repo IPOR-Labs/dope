@@ -134,7 +134,6 @@ class LinearMktImpactModel:
     self.slopes = {}
     # Example data
     x = self.x
-
     y = self.y
     if kinks is None:
       _slope = self._fit_one(x, y, should_plot=should_plot)
@@ -149,6 +148,8 @@ class LinearMktImpactModel:
           continue
         _slope = self._fit_one(x_i, y_i, should_plot=should_plot)
         self.slopes[(start, end)] = max(0, _slope) # no negative slopes
+    if should_plot:
+      plt.show()
 
     return self
 
@@ -156,7 +157,11 @@ class LinearMktImpactModel:
     if np.all(y == 0):
       slope, bias = 0, 0  
     else:
-      slope, bias = np.polyfit(x, y, 1)
+      try:
+        slope, bias = np.polyfit(x, y, 1)
+      except ValueError as e:
+        print(e)
+        slope, bias = 0, 0
       #print(slope, bias)
     # Plot the data and the line
     if should_plot:

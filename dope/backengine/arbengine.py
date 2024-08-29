@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 
+from dope.market_impact.linear import LinearMktImpactModel
+
 
 
 class TokenPortfolio:
@@ -43,10 +45,12 @@ class TokenPortfolio:
 
 class ArbBacktester:
 
-  def __init__(self, strategy, borrow_lend_data, data, mkt_impact, tokens=None):
+  def __init__(self, strategy, borrow_lend_data, data, mkt_impact=None, tokens=None):
     self.strategy = strategy
     self.data = data
     self.borrow_lend_data = borrow_lend_data
+    if mkt_impact is None:
+      mkt_impact = {mkt:LinearMktImpactModel.zero_instance() for data in self.data.values() for mkt in data.keys() } 
     self.mkt_impact = mkt_impact
     self.dates = self.get_dates()
     self.summary = None
@@ -65,7 +69,6 @@ class ArbBacktester:
 
   def get_capital(self, token):
     return self.πs[token].capital()
-
 
   def prep(self):
     self.strategy.register_engine(self)
@@ -130,8 +133,10 @@ class ArbBacktester:
             
           impacts[mkt] = self.mkt_impact[mkt].impact(date_now, π.allocation.get(mkt, 0), is_borrow=is_borrow)
           #_rate_now = df[_filter][side_name].iloc[-1]
-          
-          _rate = df[_filter][side_name].iloc[-1] + impacts[mkt]
+          if not np.isfinite(impacts[mkt]):
+            _rate = df[_filter][side_name].iloc[-1]  
+          else:
+            _rate = df[_filter][side_name].iloc[-1] + impacts[mkt]
           if not np.isfinite(_rate):
             continue
           #print(mkt,"_rate", _rate, df[_filter][side_name].iloc[-1], impacts[mkt], π.allocation.get(mkt, 0) )

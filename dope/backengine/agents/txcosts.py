@@ -55,7 +55,8 @@ class LenderMIQP(BaseAgent):
   
   def _get_optimizer_params(self, date_ix):
     rate_column = "apyBase"
-    df = pd.concat(self.data[self.token], names=["datetime"]).unstack(level=0)[rate_column]
+    #df = pd.concat(self.data[self.token], names=["datetime"]).unstack(level=0)[rate_column]
+    df = self.data.to_block(self.token)[rate_column]
     #del df["cash"]
     df = df[df.index <= date_ix]
     mean_filter = df.index > date_ix - pd.Timedelta(f"{self.mean_window}D")
@@ -133,7 +134,7 @@ class LenderMIQP(BaseAgent):
   
   def get_initial_guess(self, date_ix):
     np.random.seed(42)
-    keys = self.data[self.token].keys()
+    keys =self.opt_params.columns
     def get_r(ws):
       r = 0
       for mkt, w in ws[self.token].items():
@@ -148,16 +149,14 @@ class LenderMIQP(BaseAgent):
       return r
     rows = []
     LEN = len(keys)
-    for _ in range(300):
+    for _ in range(100):
       _ws = [np.random.rand(1)[0] for _ in range(LEN)]
       _sum = sum(_ws)
       _ws = [w/_sum for w in _ws]
       ws = {self.token:dict(zip(keys, _ws))}
       rows.append( (*_ws, get_r(ws)))
     df = pd.DataFrame(rows)
-    r_column = self.opt_params.columns
-    df[df[r_column]==df[r_column].max()]
-    ws = df[df[r_column] == df[r_column].max()].values[0,:-1]
+    ws = df.sort_values(df.columns[-1]).values[-1,:-1] # last row, drop last column
     return ws
       
 

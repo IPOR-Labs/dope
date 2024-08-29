@@ -1,3 +1,5 @@
+import numpy as np
+
 from dope.backengine.agents.base import BaseAgent
 
 from dope.price_model.mvga import MavgPredictor
@@ -57,7 +59,9 @@ class LenderJackReaper(BaseAgent):
         #print(impact)
         values[protocol] = Er + impact
         # get market with higest returns
-      mkt = max(values, key=values.get)
+      valid_values = {k:v for k,v in values.items() if np.isfinite(v)}
+      mkt = max(valid_values, key=valid_values.get)
+
       #print()
       #rint(df[_filter].iloc[0])
       #print(df[_filter].iloc[-1])

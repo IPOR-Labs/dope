@@ -15,21 +15,122 @@ class Chains(str, Enum):
   arbitrum = "Arbitrum"
 
 
-@dataclass
+class PriceRow:
+  def __init__(self, row, price_dict):
+    self.row = row
+    self.price_dict = price_dict
+  
+  def __repr__(self):
+    line = f"Price @ {self.row.name} = "
+    for k, v in self.row.items():
+      line += f"{k}: {v:.4f} | "
+    line = line[:-2]
+    return line
+  
+  def get_or_zero(self, protocol):
+    #print(protocol, self.price_dict, self.price_dict)
+    if protocol in self.price_dict:
+      #print("PRICE:::::",protocol, self.row[self.price_dict[protocol]])
+      return self.row[self.price_dict[protocol]]
+    else:
+      return 0
+
+class PriceData:
+  def __init__(self, token_price_dict: dict[str, pd.DataFrame]):
+    """
+    Example
+    price_data = PriceData({"ETH":eth, "STETH":steth})
+    protocol_token_name_dict = {
+      # Pool Token : Price Token
+      "WETH": "ETH", 
+      "WSTETH":"STETH",
+      "STETH":"STETH"
+    }
+
+    price_data.set_mkt_to_token(run_data, protocol_token_name_dict)
+    """
+    self.token_price_dict = token_price_dict
+    self.price_dict = {}
+    
+    self._price = pd.concat(self.token_price_dict).unstack(level=0).price.reset_index()
+    self._price["date"] = pd.to_datetime(self._price.reset_index().date.dt.date)
+    self._price = self._price.groupby("date").mean()
+
+  def price_row_at(self, date_ix):
+    row = self._price.loc[date_ix]
+    price_row = PriceRow(row, self.price_dict)
+    return price_row
+
+  def set_mkt_to_token(self, run_data, mkt_token_dict):
+    price_dict = {}
+    for mkt in run_data.get_markets():
+      for k, v in mkt_token_dict.items():
+        if f":{k}" in mkt:
+          price_dict[mkt] = v
+          break
+      
+    self.price_dict = price_dict
+
+
+
 class BacktestData:
-  token_mkt_data: dict[str, dict[str, pd.DataFrame]]
+  
+  def __init__(self, token_mkt_data: dict[str, dict[str, pd.DataFrame]]):
+    self.token_mkt_data = token_mkt_data
+    self._as_block = {}
+  
+  def reset_as_block(self):
+    self._as_block = {}
 
   def __getitem__(self, key):
     return self.token_mkt_data[key]
 
   def keys(self):
     return self.token_mkt_data.keys()
+  
+  def values(self):
+    return self.token_mkt_data.values()
+  
+  def get_markets(self):
+    markets = set()
+    for token in self.token_mkt_data.keys():
+      markets.update(self.token_mkt_data[token].keys())
+    return markets
 
   def items(self):
     return self.token_mkt_data.items()
 
+  def as_block(self, token):
+    if token not in self._as_block:
+      self._as_block[token] = pd.concat(self.token_mkt_data[token], names=["datetime"]).unstack(level=0)
+    return self._as_block[token]
+
   def to_block(self, token):
-    return pd.concat(self.token_mkt_data[token], names=["datetime"]).unstack(level=0)
+    return self.as_block(token)
+
+  def convert_tvl_from_usd(self, token_price_in_usd_timeseries, inplace=False):
+    this = self if inplace else self.copy()
+    
+    price_index = token_price_in_usd_timeseries.index
+    for token in this.token_mkt_data.keys():
+      for mkt in this.token_mkt_data[token].keys():
+        mkt_index = this.token_mkt_data[token][mkt].index
+        #this.token_mkt_data[token][mkt] = this.token_mkt_data[token][mkt][mkt_index.isin(price_index)].copy()
+        mkt_price = token_price_in_usd_timeseries[token_price_in_usd_timeseries.index.isin(mkt_index)].copy()
+        for c in ["totalSupplyUsd", "totalBorrowUsd"]:
+          this.token_mkt_data[token][mkt][c] = this.token_mkt_data[token][mkt][c] / mkt_price.price
+
+    this.reset_as_block()
+
+    return this
+
+  def copy(self):
+    copy_token_mkt_data = {}
+    for token, data in self.token_mkt_data.items():
+      copy_token_mkt_data[token] = {}
+      for mkt, df in data.items():
+        copy_token_mkt_data[token][mkt] = df.copy()
+    return BacktestData(copy_token_mkt_data)
 
   def get_dates(self):
     dates = set()
@@ -194,17 +295,18 @@ class DataLoader:
 class BackEngineMaestro:
   chains = Chains
   
-  def __init__(self, tokens, chain):
-    self.tokens = tokens
-    self.chain = chain
+  def __init__(self):
+    pass
 
   def set_data(self, borrow_lend_data: BacktestData):
     self.borrow_lend_data = borrow_lend_data
 
-  def load_data(self, source="defi_llama", tvl_cut=10_000_000, start_period="2023-06-01"):
+  def load_data(self, tokens: list, source="defi_llama", tvl_cut=10_000_000, start_period="2023-06-01", chain=None):
+    if chain is not None:
+      chain = self.chains.ethereum
     if "lama" in source.lower():
       print("Loading data from DeFi Llama")
-      data, borrow_lend_data = DataLoader.load_from_defi_llama(self.tokens, self.chain, tvl_cut=tvl_cut, start_period=start_period)
+      data, borrow_lend_data = DataLoader.load_from_defi_llama(tokens, chain, tvl_cut=tvl_cut, start_period=start_period)
 
     return data, BacktestData(borrow_lend_data)
   
@@ -271,17 +373,17 @@ class BackEngineMaestro:
   #   summary, ws = engine()
   #   return summary, ws
 
-  def plot_rates_ts(self, title=None, agg_str="1D", rate_column="apyBase"):
+  def plot_rates_ts(self, title=None, agg_str="1D", rate_column="apyBase", figsize_xy=(20, 5)):
     tokens = list(self.borrow_lend_data.keys())
     n_tokens = len(tokens)
-    fig, axes = plt.subplots(n_tokens, 1, figsize=(20, 5 * n_tokens)) 
+    fig, axes = plt.subplots(n_tokens, 1, figsize=(figsize_xy[0], figsize_xy[1] * n_tokens)) 
     # Check if there is only one token, axes will not be an array but a single AxesSubplot object
     if n_tokens == 1:
         axes = [axes]  # Make it iterable
 
     for ax, token in zip(axes, tokens):
         # Aggregate the data
-        agg = pd.concat(self.borrow_lend_data[token], names=["datetime"]).unstack(level=0)[rate_column]
+        agg = pd.concat(self.borrow_lend_data[token]).unstack(level=0)[rate_column]
         # Calculate the rolling mean and plot
         agg.rolling(agg_str).mean().plot(ax=ax)
         
