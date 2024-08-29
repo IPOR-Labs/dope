@@ -18,7 +18,7 @@ class GearBoxLooper(BaseAgent):
     self.verbose = False
   
   def on_start(self):
-    self.engine.
+    #self.engine.
     
     return self.ws
   
