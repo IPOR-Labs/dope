@@ -64,6 +64,24 @@ class TokenPortfolio:
     self.deposit = TokenAccount()
     self.debt = TokenAccount()
     self.cash = TokenAccount()
+  
+  def add_deposit(self, protocol, capital):
+    if protocol in self.deposit.allocation:
+      self.deposit.allocation[protocol] += capital
+    else:
+      self.deposit.allocation[protocol] = capital
+  
+  def add_debt(self, protocol, capital):
+    if protocol in self.debt.allocation:
+      self.debt.allocation[protocol] += capital
+    else:
+      self.debt.allocation[protocol] = capital
+  
+  def add_cash(self, protocol, capital):
+    if protocol in self.cash.allocation:
+      self.cash.allocation[protocol] += capital
+    else:
+      self.cash.allocation[protocol] = capital
 
   def capital(self, price_row):
     total_capital = self.cash.capital(price_row) + self.deposit.capital(price_row) - self.debt.capital(price_row)
@@ -171,7 +189,11 @@ class LoopBacktester:
     Ws = []
     _days = len(self.dates)
     print(f"Running Backtest for {_days:,} | token:{self.strategy.token }")
-    started = False
+    
+    
+    
+    did_start = False
+    
     _tenpct = _days//10
     for i in range(0, len(self.dates[:])-1):
       if i % _tenpct == 0:
@@ -186,10 +208,13 @@ class LoopBacktester:
       try:
         price_row = self.price_data.price_row_at(date_now)
       except KeyError:
-        if started:
+        if did_start:
           print("Don't have price data for ", date_now, "skipping")
         continue
-      started = True
+      if not did_start:
+        self.strategy.on_start(date_now)
+        did_start = True
+        continue
       #print("@", date_now, price_row)
 
       #print(date_now)

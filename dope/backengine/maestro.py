@@ -202,6 +202,11 @@ class BacktestData:
   
   def dump(self, filename, folderpath= pathlib.Path().home() / "s3/fusion/backtest-data"):
     pathlib.Path(folderpath / filename).mkdir(parents=True, exist_ok=True)
+    # delete data already in folder to avoid overlapping old and new data:
+    for file in (folderpath/filename).iterdir():
+      if file.is_file(): 
+        file.unlink()
+    
     for token, data in self.token_mkt_data.items():
       for mkt, df in data.items():
         df.to_csv(folderpath / filename / f"{token}_{mkt}.csv")
