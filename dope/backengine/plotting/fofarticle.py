@@ -13,7 +13,7 @@ class Plotter:
     
     plt.figure(figsize=(16,4))
     ax = plt.gca()
-    summary.rate.resample("1H").last().interpolate().plot(ax=ax)
+    summary.rate.resample("1h").last().interpolate().plot(ax=ax)
     _ = plt.legend(loc='upper left', bbox_to_anchor=(1, 1), title="Strategy")
     
     # Remove the top and right spines
@@ -30,10 +30,10 @@ class Plotter:
     plt.show()
 
     r_t = ((summary.capital/summary.capital.apply(lambda col: col.dropna().iloc[0]) - 1)*100)
-    r_t = r_t.resample("1H").last().interpolate()
+    r_t = r_t.resample("1h").last().interpolate()
     T = 365.25 * 24 * 60 * 60
     annualized_returns = r_t.apply(
-      lambda col: col.dropna()[-1] * T / (col.dropna().index[-1] - col.dropna().index[0]).total_seconds()
+      lambda col: col.dropna().iloc[-1] * T / (col.dropna().index[-1] - col.dropna().index[0]).total_seconds()
     )
     annualized_vol = r_t.apply(
       lambda col: 
