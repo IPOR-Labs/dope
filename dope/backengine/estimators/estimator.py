@@ -1,5 +1,6 @@
 from dope.backengine.estimators.baseestimator import BaseEstimator
 import numpy as np
+from datetime import timedelta
 
 class Estimator(BaseEstimator):
   def __init__(self):
@@ -27,7 +28,7 @@ class Estimator(BaseEstimator):
     """
     
     rolling = df[rt_col].rolling(lag)
-    k = np.sqrt(2)
+    sqrt_dt = np.sqrt(timedelta(1)/((df[rt_col].index[-1]-df[rt_col].index[0])/(df[rt_col].count()-1)))
 
-    sigma = rolling.std()
+    sigma = sqrt_dt*rolling.std()
     return sigma

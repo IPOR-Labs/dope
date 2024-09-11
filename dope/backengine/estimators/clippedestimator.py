@@ -1,5 +1,6 @@
 from dope.backengine.estimators.baseestimator import BaseEstimator
 import numpy as np
+from datetime import timedelta
 
 class ClippedEstimator(BaseEstimator):
   def __init__(self, quantile):
@@ -34,7 +35,7 @@ class ClippedEstimator(BaseEstimator):
     quantiles = df.quantile(self.quantile)
     df_clipped = df.clip(upper=quantiles, axis=1) # column-wise
     rolling = df_clipped.rolling(lag)
-    k = np.sqrt(2)
+    sqrt_dt = np.sqrt(timedelta(1)/((df_clipped.index[-1]-df_clipped.index[0])/(df_clipped.count()-1)))
 
-    sigma = rolling.std()
+    sigma = sqrt_dt*rolling.std()
     return sigma
