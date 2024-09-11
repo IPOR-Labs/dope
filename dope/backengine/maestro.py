@@ -1,4 +1,5 @@
 import pathlib
+import warnings
 import itertools
 import numpy as np
 import pandas as pd
@@ -8,6 +9,7 @@ from dataclasses import dataclass
 from collections import defaultdict
 
 from dope.market_impact.linear import LinearMktImpactModel
+from dope.market_impact.neighborhood import NeighborhoodMktImpactModel
 
 
 class Chains(str, Enum):
@@ -52,7 +54,9 @@ class PriceData:
     self.token_price_dict = token_price_dict
     self.price_dict = {}
     
+    warnings.simplefilter(action='ignore', category=FutureWarning)
     self._price = pd.concat(self.token_price_dict).unstack(level=0).price.reset_index()
+    warnings.simplefilter('default')
     self._price["date"] = pd.to_datetime(self._price.reset_index().date.dt.date)
     self._price = self._price.groupby("date").mean()
 
@@ -102,7 +106,9 @@ class BacktestData:
 
   def as_block(self, token):
     if token not in self._as_block:
+      warnings.simplefilter(action='ignore', category=FutureWarning)
       self._as_block[token] = pd.concat(self.token_mkt_data[token], names=["datetime"]).unstack(level=0)
+      warnings.simplefilter('default')
     return self._as_block[token]
 
   def to_block(self, token):
@@ -339,6 +345,14 @@ class BackEngineMaestro:
 
     return data, BacktestData(borrow_lend_data)
 
+  def get_historical_mkt_impact_model(self, run_data, past_window_days=7, future_window_days=0):
+    mkt_impact = {
+      mkt: NeighborhoodMktImpactModel(past_window_days=past_window_days, future_window_days=future_window_days)
+      for mkt in run_data.get_markets()
+    }
+    mkt_impact["cash"] = LinearMktImpactModel.zero_instance()
+    return mkt_impact
+
   def estimate_mkt_impact_model(self, kinks = None, should_plot=False):
 
     mkt_impact = {"cash":LinearMktImpactModel.zero_instance()}
@@ -388,7 +402,7 @@ class BackEngineMaestro:
 
     for ax, token in zip(axes, tokens):
         # Aggregate the data
-        agg = pd.concat(self.borrow_lend_data[token]).unstack(level=0)[rate_column]
+        agg = self.borrow_lend_data.as_block(token)[rate_column]
         # Calculate the rolling mean and plot
         agg.rolling(agg_str).mean().plot(ax=ax)
         
@@ -415,7 +429,7 @@ class BackEngineMaestro:
     
     for i, token in enumerate(self.tokens, start=1):
         # Aggregate the data
-        agg = pd.concat(self.borrow_lend_data[token], names=["datetime"]).unstack(level=0).apyBaseBorrow
+        agg = self.borrow_lend_data.as_block(token).apyBaseBorrow
         # Calculate the rolling mean
         rolling_mean = agg.rolling("7D").mean()
 

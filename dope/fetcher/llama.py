@@ -34,8 +34,8 @@ class Llama:
     df["datetime"] = pd.to_datetime(df["datetime"])
     df = df.set_index("datetime")
 
-    df["totalBorrowUsd"] = df["totalBorrowUsd"].interpolate(method='linear')
-    df["totalSupplyUsd"] = df["totalSupplyUsd"].interpolate(method='linear')
+    df["totalBorrowUsd"] = df["totalBorrowUsd"].astype(float).interpolate(method='linear')
+    df["totalSupplyUsd"] = df["totalSupplyUsd"].astype(float).interpolate(method='linear')
     df["utilizationRate"] = df["totalBorrowUsd"]/df["totalSupplyUsd"]
 
     return df
@@ -79,7 +79,7 @@ class Llama:
       data[_name] = data[_name][data[_name].index >= start_period]
       print(_name, row.pool, len(data[_name]), len(borrow_lend_data[_name]))
       
-      data[_name]["utilizationRate"] = borrow_lend_data[_name]["utilizationRate"].fillna(0.5)
+      data[_name]["utilizationRate"] = borrow_lend_data[_name]["utilizationRate"].fillna(0.5).infer_objects()
     self.data = data
     self.borrow_lend_data = borrow_lend_data
     return data, borrow_lend_data

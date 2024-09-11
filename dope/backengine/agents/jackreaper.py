@@ -37,7 +37,6 @@ class LenderJackReaper(BaseAgent):
         return self.ws
     if self.verbose:
       print("Acting....", date_ix)
-    #print("CAPITAL", self.capital, self.days_window)
 
     ws = {mkt:0 for mkt in self.data[self.token].keys()}
     steps = self.steps
@@ -56,20 +55,14 @@ class LenderJackReaper(BaseAgent):
         )
         if impact is None:
           continue
-        #print(impact)
         values[protocol] = Er + impact
-        # get market with higest returns
+        # get market with highest returns
       valid_values = {k:v for k,v in values.items() if np.isfinite(v)}
-      mkt = max(valid_values, key=valid_values.get)
+      if len(valid_values) > 0:
+      
+        mkt = max(valid_values, key=valid_values.get)
+        ws[mkt] += 1/steps
 
-      #print()
-      #rint(df[_filter].iloc[0])
-      #print(df[_filter].iloc[-1])
-      #
-      ws[mkt] += 1/steps
-      #print(values)
-      #for k, v in values.items(): print(k, v)
-      #print(ws)
+    ws = {k:w for k,w in ws.items() if w != 0}
     self.ws = {self.token:ws}
-    # print(self.ws)
     return self.ws
