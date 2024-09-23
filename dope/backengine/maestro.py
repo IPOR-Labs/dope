@@ -345,6 +345,26 @@ class BackEngineMaestro:
 
     return data, BacktestData(borrow_lend_data)
 
+  def interpolate_data(self, borrow_lend_data, agg_str="1h"):
+    """
+    Interporlates the data to a short time frame. 
+    agg_str: str, the time frame to interpolate the data to. Default to "1h" (one hour), 
+      for other options see https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases
+    """
+    enhanced_borrow_lend_data = {t:{} for t in borrow_lend_data.keys()}
+    for token in enhanced_borrow_lend_data.keys():
+      for mkt in borrow_lend_data[token].keys():
+        enhanced_borrow_lend_data[token][mkt] = (
+          borrow_lend_data[token][mkt]
+          .resample(agg_str)
+          .last()
+          .infer_objects(copy=False) 
+          .apply(pd.to_numeric, errors='coerce')
+          .interpolate()
+        )
+    enhanced_borrow_lend_data = BacktestData(enhanced_borrow_lend_data)
+    return enhanced_borrow_lend_data
+
   def get_historical_mkt_impact_model(self, run_data, past_window_days=7, future_window_days=0):
     mkt_impact = {
       mkt: NeighborhoodMktImpactModel(past_window_days=past_window_days, future_window_days=future_window_days)
