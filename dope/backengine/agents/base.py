@@ -1,12 +1,12 @@
 class BaseAgent:
 
-  def __init__(self, capital):
-    self.capital = capital
-    self.engine = None
+    def __init__(self, capital):
+        self.capital = capital
+        self.engine = None
 
-  def register_engine(self, engine):
-    self.engine = engine
+    def register_engine(self, engine):
+        self.engine = engine
 
-  @property
-  def data(self):
-    return self.engine.borrow_lend_data
+    @property
+    def data(self):
+        return self.engine.borrow_lend_data
