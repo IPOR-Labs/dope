@@ -19,7 +19,7 @@ Some of the common use cases of Dope are:
 
 # Where to start
 
-Look at the [notebooks]("https://github.com/IPOR-Labs/dope/tree/main/notebooks") folder for a few tutorials.
+Look at the [notebooks](https://github.com/IPOR-Labs/dope/tree/main/notebooks) folder for a few tutorials.
 
 For a simple backtest example look at [[Tutorial] Simple Backtest.ipynb](https://github.com/IPOR-Labs/dope/blob/main/notebooks/%5BTutorial%5D%20Simple%20Backtest.ipynb)
 
