@@ -177,7 +177,7 @@ class LoopBacktester:
         r_breakdown = {}
         impacts = {}
         for mkt, capital in account.allocation.items():
-            chain, protocol, token = mkt.split(":")
+            chain, protocol, token = mkt
             # print(chain, protocol, token, mkt)
             if mkt not in self.data[token]:
                 continue

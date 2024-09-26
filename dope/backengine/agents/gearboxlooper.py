@@ -16,8 +16,6 @@ class GearBoxLooper(BaseAgent):
         self.debt_cap = self.leverage * self.capital - self.capital
         self.supply_cap = self.capital * leverage
 
-        # print(self.engine.π.weights())
-
         self.verbose = False
 
     def on_start(self, date_ix):
@@ -26,7 +24,7 @@ class GearBoxLooper(BaseAgent):
         price_now = self.engine.price_data.price_row_at(date_ix)
         self.ws = self.engine.π.weights(price_now)
         print(self.ws)
-        return self.ws
+        return self.ws # {protocl1: 0.9, protocol2: 0.1}
 
     def on_liquidation(self, date_ix):
         return {}

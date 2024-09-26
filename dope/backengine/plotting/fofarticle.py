@@ -129,7 +129,7 @@ class Plotter:
                 if k == "cash":
                     continue
                 for protocol in color_counter.keys():
-                    if protocol in k.split(":")[1]:
+                    if protocol in k.protocol:
                         color_counter[protocol] += 1
         color_counter
 
@@ -150,7 +150,7 @@ class Plotter:
                 if k == "cash":
                     continue
                 for protocol in color_counter.keys():
-                    if protocol in k.split(":")[1]:
+                    if protocol in k.protocol:
                         color_counter[protocol] += 1
         color_counter
 
@@ -174,7 +174,7 @@ class Plotter:
             for k, df in run.run_data[token].items():
                 if k == "cash":
                     continue
-                label = k.split(":")[1]
+                label = k.protocol
                 _label = label
                 if did_label[label]:
                     _label = None

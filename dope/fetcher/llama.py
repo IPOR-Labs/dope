@@ -1,6 +1,7 @@
 import requests
 import pandas as pd
 
+from dope.names.poolname import PoolName
 
 class Llama:
     def __init__(self):
@@ -76,7 +77,7 @@ class Llama:
                 _meta = f"({_meta})"
             else:
                 _meta = ""
-            _name = row.chain + ":" + row.project + f"{_meta}" + ":" + row.symbol
+            _name = PoolName(row.chain, row.project, row.symbol)
             print(_name, end="\r")
             borrow_lend_data[_name] = self.borrow_lend(row.pool)
             _filter = borrow_lend_data[_name].index >= start_period
