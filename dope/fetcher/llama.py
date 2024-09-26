@@ -74,10 +74,11 @@ class Llama:
         for _, row in poolids.iterrows():
             _meta = row.poolMeta
             if _meta is not None:
-                _meta = f"({_meta})"
+                _meta = f"({_meta})".replace(":", "")
             else:
                 _meta = ""
-            _name = PoolName(row.chain, row.project, row.symbol)
+        
+            _name = PoolName(row.chain, row.project + f"{_meta}", row.symbol)
             print(_name, end="\r")
             borrow_lend_data[_name] = self.borrow_lend(row.pool)
             _filter = borrow_lend_data[_name].index >= start_period
