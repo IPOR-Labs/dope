@@ -10,6 +10,9 @@ class PoolName:
     def __repr__(self) -> str:
         return f"{self.chain}:{self.protocol}:{self.token_name}"
     
+    def __str__(self) -> str:
+        return repr(self)
+    
     def __hash__(self) -> int:
         return hash(repr(self))
     

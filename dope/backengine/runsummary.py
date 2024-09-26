@@ -5,6 +5,22 @@ from dataclasses import dataclass
 from dope.backengine.maestro import BacktestData
 
 
+def serialize_ws(row):
+  ret_dict = {}
+  for token, ddict in row.items():
+    ret_dict[token] = {}
+    for k, df in ddict.items():
+      ret_dict[token][str(k)] = df
+  return ret_dict
+
+
+def serialize(row):
+  ret_dict = {}
+  for k, df in row.items():
+    ret_dict[str(k)] = df
+  return ret_dict
+
+
 @dataclass
 class BacktestSummary:
     name: str
@@ -16,16 +32,22 @@ class BacktestSummary:
         filename=None,
         folderpath=pathlib.Path().home() / "s3/fusion/backtest-data",
     ):
+        folderpath = pathlib.Path(folderpath)
         filename = filename or self.name
         pathlib.Path(folderpath / filename).mkdir(parents=True, exist_ok=True)
         for mkt, df in self.summary.items():
-            df.to_parquet(folderpath / filename / f"{mkt}.parquet")
+            tmp = df.copy(deep=True)
+            tmp["ws"] = tmp.ws.apply(serialize_ws)
+            for col in ["mkt_impact", "breakdown"]:
+                tmp[col] = tmp.ws.apply(serialize)
+            tmp.to_parquet(folderpath / filename / f"{mkt}.parquet")
         self.run_data.dump(f"{filename}/run_data", folderpath)
 
     @classmethod
     def load(
         cls, filename, folderpath=pathlib.Path().home() / "s3/fusion/backtest-data"
     ):
+        folderpath = pathlib.Path(folderpath)
         summary = {}
         for file in pathlib.Path(folderpath / filename).glob("*.parquet"):
             if not file.is_file():
