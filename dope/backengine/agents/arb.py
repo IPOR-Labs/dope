@@ -19,7 +19,7 @@ class ArbStrategy:
     def borrow_lend_data(self):
         return self.engine.data
 
-    def act(self, date_ix):
+    def on_act(self, date_ix):
 
         pay_token = self.pay_token
         rec_token = self.rec_token

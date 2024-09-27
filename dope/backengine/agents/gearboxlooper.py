@@ -24,12 +24,12 @@ class GearBoxLooper(BaseAgent):
         price_now = self.engine.price_data.price_row_at(date_ix)
         self.ws = self.engine.π.weights(price_now)
         print(self.ws)
-        return self.ws # {protocl1: 0.9, protocol2: 0.1}
+        return self.ws
 
     def on_liquidation(self, date_ix):
         return {}
 
-    def act(self, date_ix):
+    def on_act(self, date_ix):
         """
         date_ix is the date index NOW.
         One can think as the index of the filtration \mathcal{F}_{ix}, i.e.,

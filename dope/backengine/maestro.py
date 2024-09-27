@@ -324,7 +324,6 @@ class BackEngineMaestro:
     def plotly_rates_ts(self, title=None):
         import plotly.graph_objects as go
         from plotly.subplots import make_subplots
-        import pandas as pd
 
         n_tokens = len(self.tokens)
 

@@ -21,7 +21,7 @@ class MktImpactLender(BaseAgent):
         self.engine = None
         self._lambda = risk_aversion
 
-    def act(self, date_ix):
+    def on_act(self, date_ix):
         _data = {}
         for protocol, df in self.data.items():
             _filter = df.index <= date_ix

@@ -6,7 +6,7 @@ class LenderJackReaper(BaseAgent):
         self.capital = capital
         self.engine = None
 
-    def act(self, date_ix, parts=1):
+    def on_act(self, date_ix, parts=1):
 
         ws = {mkt: 0 for mkt in self.data.keys()}
         steps = 1

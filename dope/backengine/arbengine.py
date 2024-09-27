@@ -14,7 +14,6 @@ class TokenPortfolio:
     def compound(self, protocol_rate_dict, dt):
         for protocol, rate in protocol_rate_dict.items():
             if protocol in self.allocation:
-                # print("C::: ",protocol, self.allocation[protocol],  (1 + rate/100*dt), self.allocation[protocol] * (1 + rate/100*dt))
                 self.allocation[protocol] = self.allocation[protocol] * (
                     1 + rate / 100 * dt
                 )
@@ -185,7 +184,7 @@ class ArbBacktester:
                     )
 
             # Step 2: Strategy Acts
-            ws = self.strategy.act(date_now)
+            ws = self.strategy.on_act(date_now)
             # print("Ws::::",ws)
 
             # step 3: Rebalance

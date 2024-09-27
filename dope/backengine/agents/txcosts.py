@@ -314,7 +314,7 @@ class LenderMIQP(BaseAgent):
             return np.round(w_opt, prec)
         return w_opt
 
-    def act(self, date_ix):
+    def on_act(self, date_ix):
         """
         date_ix is the date index NOW.
         One can think as the index of the filtration \mathcal{F}_{ix}, i.e.,

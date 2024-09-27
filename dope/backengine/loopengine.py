@@ -292,7 +292,7 @@ class LoopBacktester:
                 # Ws.append([date_now, self.strategy.token, {token:ws_before}, self.π.capital(price_row)])
 
             # Step 2: Strategy Acts
-            ws = self.strategy.act(date_now)
+            ws = self.strategy.on_act(date_now)
             # print("Ws::::",ws)
 
             # step 3: Rebalance

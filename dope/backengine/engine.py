@@ -43,7 +43,7 @@ class Backtester:
             #  break
             # print(date_now)
 
-            ws = self.lender.act(date_prev)
+            ws = self.lender.on_act(date_prev)
             # rate = 0
             r_breakdown = {}
             slopes = {}

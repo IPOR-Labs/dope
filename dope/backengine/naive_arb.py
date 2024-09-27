@@ -16,7 +16,7 @@ class OneMktStrategy:
     def borrow_lend_data(self):
         return self.engine.borrow_lend_data
 
-    def act(self):
+    def on_act(self):
 
         pay_token = self.pay_token
         rec_token = self.rec_token
@@ -52,5 +52,5 @@ class NaiveArbBacktest:
     def run(self, pay_token, rec_token, pay_protocol=None, rec_protocol=None):
         strategy = OneMktStrategy(pay_token, rec_token, pay_protocol, rec_protocol)
         strategy.set_engine(self)
-        self.borrow, self.lend, self.borrow_pool, self.lend_pool = strategy.act()
+        self.borrow, self.lend, self.borrow_pool, self.lend_pool = strategy.on_act()
         self.pnl = self.lend / 100 / 365 - self.borrow / 100 / 365 + 1
