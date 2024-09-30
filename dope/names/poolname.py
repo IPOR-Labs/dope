@@ -6,6 +6,7 @@ class PoolName:
     chain: str
     protocol: str
     token_name:str
+    pool_id: str = None
     
     def __repr__(self) -> str:
         return f"{self.chain}:{self.protocol}:{self.token_name}"
