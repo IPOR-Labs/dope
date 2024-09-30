@@ -32,7 +32,7 @@ class GearBoxLooper(BaseAgent):
     def on_act(self, date_ix):
         """
         date_ix is the date index NOW.
-        One can think as the index of the filtration \mathcal{F}_{ix}, i.e.,
+        One can think as the index of the filtration $\\mathcal{F}_{ix}$, i.e.,
         the increasing sequence of information sets where the agent is acts.
 
         """

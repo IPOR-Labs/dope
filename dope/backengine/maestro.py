@@ -8,7 +8,9 @@ from collections import defaultdict
 
 from dope.market_impact.linear import LinearMktImpactModel
 from dope.market_impact.neighborhood import NeighborhoodMktImpactModel
-from dope.backengine.backtestdata import BacktestData
+from dope.backengine.backtestdata import BacktestData, DataCollection, PriceCollection
+from dope.names.poolname import PoolName
+from dope.pools.pools import Pool
 
 
 class Chains(str, Enum):
@@ -29,7 +31,6 @@ class PriceRow:
         return line
 
     def get_or_zero(self, protocol):
-        # print(protocol, self.price_dict, self.price_dict)
         if protocol in self.price_dict:
             # print("PRICE:::::",protocol, self.row[self.price_dict[protocol]])
             return self.row[self.price_dict[protocol]]
@@ -70,22 +71,39 @@ class PriceData:
     def set_mkt_to_token(self, run_data, mkt_token_dict):
         price_dict = {}
         for mkt in run_data.get_markets():
-            for k, v in mkt_token_dict.items():
-                if f":{k}" in mkt:
+            for k, v in mkt_token_dict.items():                
+                if isinstance(mkt, str) and f":{k}" in mkt:
                     price_dict[mkt] = v
                     break
-
+                elif isinstance(mkt, PoolName) and mkt.token_name == k:
+                    price_dict[mkt] = v
+                    break
         self.price_dict = price_dict
 
 
 class DataLoader:
+    
+    def __init__(self):
+        from dope.fetcher.llama import Llama
+        self.llama = Llama()
+        self.pools_df = None
+
+    def load_one_from_defi_llama(self, pool_id,  start_period="2023-06-01"):
+        if self.pools_df is None:
+            self.pools_df = self.llama.get_pools()
+        pools = self.pools_df
+        
+        data, borrow_lend_data = self.llama.load_data_from_pool_ids(
+            pools[pools.pool.isin([pool_id])], start_period=start_period
+        )
+        key = list(borrow_lend_data.keys())[0]
+        return key, borrow_lend_data[key]
 
     @classmethod
     def load_from_defi_llama(
         self, tokens, chain, tvl_cut=10_000_000, start_period="2023-06-01"
     ):
         from dope.fetcher.llama import Llama
-
         llama = Llama()
 
         data, borrow_lend_data = {}, {}
@@ -164,7 +182,48 @@ class BackEngineMaestro:
     chains = Chains
 
     def __init__(self):
-        pass
+        self.data_loader = DataLoader()
+        self.borrow_lend_data = None
+        self.pools = {}
+        self.rates_data_collection = DataCollection(name="rates")
+        self.price_data_collection = PriceCollection(name="prices")
+    
+    def load_pool_data(self, pool: Pool):
+        if pool.debt_pool_id is not None:
+            if not self.rates_data_collection.id_isin(pool.debt_pool_id):
+                pool_name_debt, borrow_lend_data = self.data_loader.load_one_from_defi_llama(pool.debt_pool_id)
+                self.rates_data_collection.add(pool_name_debt, borrow_lend_data)
+                pool.debt_rate_keyid = pool_name_debt
+        if pool.deposit_pool_id is not None:
+            if not self.rates_data_collection.id_isin(pool.deposit_pool_id):
+                pool_name_deposit, borrow_lend_data = self.data_loader.load_one_from_defi_llama(pool.deposit_pool_id)
+                self.rates_data_collection.add(pool_name_deposit, borrow_lend_data)
+                pool.deposit_rate_keyid = pool_name_deposit
+        return pool
+    
+    def load_pools_data(self, pools: list[Pool]):
+        for p in pools:
+            pool = self.load_pool_data(p)
+            self.pools[pool] = pool
+        return self.pools
+    
+    def load_price_data(self, pools: list[Pool]):
+        from dope.fetcher.coingecko import CoinGecko
+        cg = CoinGecko()
+        for p in pools:
+            if p.deposit_token_keyid is None:
+                continue
+            if p.deposit_token not in self.price_data_collection.collection:
+                price_data = cg.get_last_year_price(p.deposit_token_keyid)
+                self.price_data_collection.add(p.deposit_token, price_data)
+        for p in pools:
+            if p.debt_token_keyid is None:
+                continue
+            if p.debt_token not in self.price_data_collection.collection:
+                cg = CoinGecko()
+                price_data = cg.get_last_year_price(p.debt_token_keyid)
+                self.price_data_collection.add(p.debt_token, price_data)
+        
 
     def set_data(self, borrow_lend_data: BacktestData):
         self.borrow_lend_data = borrow_lend_data
@@ -238,6 +297,24 @@ class BackEngineMaestro:
         enhanced_borrow_lend_data = BacktestData(enhanced_borrow_lend_data)
         return enhanced_borrow_lend_data
 
+    def data_collection_to_backtest_data(self, data_collection=None):
+        data_collection = data_collection or self.rates_data_collection
+        
+        borrow_lend_data = {}
+
+        for p in self.pools.values():
+            if p.deposit_rate_keyid is not None:
+                token = p.deposit_token
+                if token not in borrow_lend_data:
+                    borrow_lend_data[token] = {}
+                borrow_lend_data[token][p.deposit_rate_keyid] = data_collection[p.deposit_rate_keyid]
+            if p.debt_rate_keyid is not None:
+                token = p.debt_token
+                if token not in borrow_lend_data:
+                    borrow_lend_data[token] = {}
+                borrow_lend_data[token][p.debt_rate_keyid] = data_collection[p.debt_rate_keyid]
+        return BacktestData(borrow_lend_data)
+
     def get_historical_mkt_impact_model(
         self, run_data, past_window_days=7, future_window_days=0
     ):
@@ -292,9 +369,19 @@ class BackEngineMaestro:
     #   return summary, ws
 
     def plot_rates_ts(
-        self, title=None, agg_str="1D", rate_column="apyBase", figsize_xy=(20, 5)
+        self, 
+        borrow_lend_data=None,
+        title=None, 
+        agg_str="1D",
+        rate_column="apyBase",
+        figsize_xy=(20, 5)
     ):
-        tokens = list(self.borrow_lend_data.keys())
+        if borrow_lend_data is None:
+            borrow_lend_data = self.borrow_lend_data
+        elif isinstance(borrow_lend_data, DataCollection):
+            borrow_lend_data = self.data_collection_to_backtest_data(borrow_lend_data)
+        
+        tokens = list(borrow_lend_data.keys())
         n_tokens = len(tokens)
         fig, axes = plt.subplots(
             n_tokens, 1, figsize=(figsize_xy[0], figsize_xy[1] * n_tokens)
@@ -305,7 +392,7 @@ class BackEngineMaestro:
 
         for ax, token in zip(axes, tokens):
             # Aggregate the data
-            agg = self.borrow_lend_data.as_block(token)[rate_column]
+            agg = borrow_lend_data.as_block(token)[rate_column]
             # Calculate the rolling mean and plot
             agg.rolling(agg_str).mean().plot(ax=ax)
 

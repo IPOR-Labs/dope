@@ -10,10 +10,6 @@ class BacktestData:
 
     def __init__(self, token_mkt_data: dict[str, dict[str, pd.DataFrame]]):
         self.token_mkt_data = token_mkt_data
-        self._as_block = {}
-
-    def reset_as_block(self):
-        self._as_block = {}
 
     def __getitem__(self, key):
         return self.token_mkt_data[key]
@@ -34,13 +30,19 @@ class BacktestData:
         return self.token_mkt_data.items()
 
     def as_block(self, token):
-        if token not in self._as_block:
-            warnings.simplefilter(action="ignore", category=FutureWarning)
-            self._as_block[token] = pd.concat(
-                self.token_mkt_data[token], names=["datetime"]
-            ).unstack(level=0)
-            warnings.simplefilter("default")
-        return self._as_block[token]
+        warnings.simplefilter(action="ignore", category=FutureWarning)
+        ret_df = pd.concat(
+            self.token_mkt_data[token], names=["datetime"]
+        ).unstack(level=0)
+        warnings.simplefilter("default")
+
+        return ret_df
+    
+    def get_pool_df(self, pool_name):
+        for token in self.token_mkt_data.keys():
+            if pool_name in self.token_mkt_data[token]:
+                return self.token_mkt_data[token][pool_name]
+        raise ValueError(f"Pool {pool_name} not found in data.")
 
     def to_block(self, token):
         return self.as_block(token)
@@ -60,8 +62,6 @@ class BacktestData:
                     this.token_mkt_data[token][mkt][c] = (
                         this.token_mkt_data[token][mkt][c] / mkt_price.price
                     )
-
-        this.reset_as_block()
 
         return this
 
@@ -183,3 +183,108 @@ class BacktestData:
                 token_mkt_data[token][mkt].index
             )
         return cls(token_mkt_data)
+
+
+class DataCollection:
+    
+    def __init__(self, name, collection=None):
+        self.name = name
+        self.collection = collection or {}
+    
+    def __getitem__(self, key):
+        return self.collection[key]
+    
+    def add(self, key, data):
+        self.collection[key] = data
+    
+    def update(self, data):
+        self.collection.update(data)
+    
+    def keys(self):
+        return self.collection.keys()
+
+    def items(self):
+        return self.collection.items()
+
+    def id_isin(self, key):
+        for k in self.collection.keys():
+            if key in k.pool_id:
+                return True
+        return False
+
+    def __repr__(self):
+        keys_str = ", ".join([str(k) for k in self.collection.keys()])
+        return f"RatesDataCollection({len(self.collection)} items -- {keys_str[:100]}...)"
+
+    def dump(
+        self, filename, folderpath=pathlib.Path().home() / "s3/fusion/backtest-data"
+    ):
+        folderpath = pathlib.Path(folderpath)
+        pathlib.Path(folderpath / filename).mkdir(parents=True, exist_ok=True)
+        # delete data already in folder to avoid overlapping old and new data:
+        for file in (folderpath / filename).iterdir():
+            if file.is_file():
+                file.unlink()
+
+        for mkt, df in self.collection.items():
+            if isinstance(mkt, PoolName):
+                mkt_name = mkt.to_disk_name()
+            else:
+                mkt_name = mkt
+            df.to_csv(folderpath / filename / f"{self.name}_{mkt_name}.csv")
+
+    @classmethod
+    def load(
+        cls,
+        filename,
+        folderpath=pathlib.Path().home() / "s3/fusion/backtest-data",
+        verbose=False,
+    ):
+        folderpath = pathlib.Path(folderpath)
+        collection = {}
+        for file in pathlib.Path(folderpath / filename).iterdir():
+            token_divisor = file.stem.find('_')
+            name, mkt_name = file.stem[:token_divisor], file.stem[token_divisor+1:]
+            mkt = PoolName.try_from_disk_name(mkt_name, verbose=verbose)
+            
+            collection[mkt] = pd.read_csv(file, index_col=0)
+            collection[mkt].index = pd.to_datetime(collection[mkt].index)
+        return cls(name=name, collection=collection)
+
+
+class PriceRow:
+    def __init__(self, row):
+        self.row = row
+
+    def __repr__(self):
+        line = f"Price @ {self.row.name} = "
+        for k, v in self.row.items():
+            line += f"{k}: {v:.4f} | "
+        line = line[:-2]
+        return line
+
+    def get_or_zero(self, token):
+        if token in self.row:
+            return self.row[token]
+        else:
+            return 0
+    
+    def get(self, token):
+        return self.row[token]
+
+
+class PriceCollection(DataCollection):
+    
+    def set_up_price_timeseries(self):
+        warnings.simplefilter(action="ignore", category=FutureWarning)
+        self._price = (
+            pd.concat(self.collection).unstack(level=0).price.reset_index()
+        )
+        warnings.simplefilter("default")
+        self._price["date"] = pd.to_datetime(self._price.reset_index().date.dt.date)
+        self._price = self._price.groupby("date").mean()
+
+    def price_row_at(self, date_ix):
+        row = self._price.loc[date_ix]
+        price_row = PriceRow(row)
+        return price_row
