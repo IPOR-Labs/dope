@@ -40,7 +40,9 @@ class CoinGecko:
         response = requests.get(url, params=params)
 
         data = response.json()
+        print(f"Data for {token_name} with ...", end="\r")
         df = self._parse_price(data)
+        print(f"Data for {token_name} with {len(df)} rows")
         return df.resample("1D").last()
 
     def get_price(self, token_name, _from: str, _to: str):
@@ -60,4 +62,10 @@ class CoinGecko:
 
         data = response.json()
         df = self._parse_price(data)
+        print(f"Data for {token_name} with {len(df)} rows")
         return df.resample("1D").last()
+    
+    def get_token_list(self):
+        url = "https://api.coingecko.com/api/v3/coins/list"
+        response = requests.get(url)
+        return pd.DataFrame(response.json())
