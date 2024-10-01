@@ -57,6 +57,7 @@ class ArbBacktester:
                 for data in self.data.values()
                 for mkt in data.keys()
             }
+            mkt_impact["cash"] = LinearMktImpactModel.zero_instance()
         self.mkt_impact = mkt_impact
         self.dates = self.get_dates()
         self.summary = None
