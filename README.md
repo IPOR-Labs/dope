@@ -29,4 +29,3 @@ For a simple backtest example look at [[Tutorial] Simple Backtest.ipynb](https:/
 pip install -e .
 ```
 
-
