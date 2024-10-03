@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 
 from dope.market_impact.linear import LinearMktImpactModel
+from dope.market_impact.neighborhood import NeighborhoodMktImpactModel
 from dope.pools.pools import Pool
 from dope.token import Token
 
@@ -134,11 +135,7 @@ class LoopBacktester(TradeInterface):
         self.data = data
         self.price_data = price_data
         if mkt_impact is None:
-            mkt_impact = {
-                mkt: LinearMktImpactModel.zero_instance()
-                for data in self.data.values()
-                for mkt in data.keys()
-            }
+            mkt_impact = {mkt:NeighborhoodMktImpactModel() for mkt in self.data.keys()}
         self.mkt_impact = mkt_impact
         self.pools = pools
         self.dates = self.get_dates()
