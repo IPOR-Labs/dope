@@ -6,9 +6,11 @@ from enum import Enum
 import matplotlib.pyplot as plt
 from collections import defaultdict
 
+
 from dope.market_impact.linear import LinearMktImpactModel
 from dope.market_impact.neighborhood import NeighborhoodMktImpactModel
 from dope.backengine.backtestdata import BacktestData, DataCollection, PriceCollection
+from dope.fetcher.coingecko import CoinGecko
 from dope.names.poolname import PoolName
 from dope.pools.pools import Pool
 
@@ -185,8 +187,13 @@ class BackEngineMaestro:
         self.data_loader = DataLoader()
         self.borrow_lend_data = None
         self.pools = {}
+
+        self.base_token = "dollar"
+        self.rates_data_in_base_token = None
         self.rates_data_collection = DataCollection(name="rates")
         self.price_data_collection = PriceCollection(name="prices")
+        
+        
     
     def load_pool_data(self, pool: Pool):
         if pool.debt_pool_id is not None:
@@ -208,7 +215,7 @@ class BackEngineMaestro:
         return self.pools
     
     def load_price_data(self, pools: list[Pool]):
-        from dope.fetcher.coingecko import CoinGecko
+        
         cg = CoinGecko()
         for p in pools:
             if p.deposit_token_keyid is None:
@@ -220,10 +227,20 @@ class BackEngineMaestro:
             if p.debt_token_keyid is None:
                 continue
             if p.debt_token not in self.price_data_collection.collection:
-                cg = CoinGecko()
                 price_data = cg.get_last_year_price(p.debt_token_keyid)
                 self.price_data_collection.add(p.debt_token, price_data)
+    
+    def set_base_token(self, token_name):
+        self.base_token = token_name
+    
+    def convert_data_to_base_token(self, base_token=None):
+        if base_token is not None:
+            self.set_base_token(base_token)
+        self.price_data_collection.set_base_token_name(self.base_token)
+        self.price_data_collection.set_up_price_timeseries()
         
+        price_timeseries = self.price_data_collection._price[self.base_token]
+        self.rates_data_in_base_token = self.rates_data_collection.convert_tvl_from_usd(price_timeseries)
 
     def set_data(self, borrow_lend_data: BacktestData):
         self.borrow_lend_data = borrow_lend_data

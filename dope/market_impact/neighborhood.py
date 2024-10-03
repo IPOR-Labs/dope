@@ -69,6 +69,8 @@ class NeighborhoodMktImpactModel:
         """
 
         df = self.get_data_slice_for_date(timestamp)
+        if len(df) == 0:
+            return np.nan
 
         _filter = self.data_ref.index <= timestamp
         row = self.data_ref[_filter].iloc[-1]

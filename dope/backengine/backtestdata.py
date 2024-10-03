@@ -139,7 +139,7 @@ class BacktestData:
         for token in self.token_mkt_data.keys():
             mkts = list(self.token_mkt_data[token].keys())
             if len(mkts) == 0:
-                return
+                continue
             mkt_example = self.token_mkt_data[token][mkts[0]]
             self.token_mkt_data[token]["cash"] = mkt_example.copy(deep=True)
             self.token_mkt_data[token]["cash"]["apyBase"] = 0
@@ -206,11 +206,38 @@ class DataCollection:
     def items(self):
         return self.collection.items()
 
+    def copy(self):
+        """
+        Return a copy of this object
+        """
+        copy_collection = {}
+        for key, df in self.collection.items():
+            copy_collection[key] = df.copy()
+        return DataCollection(name=self.name, collection=copy_collection)
+        
+
     def id_isin(self, key):
         for k in self.collection.keys():
             if key in k.pool_id:
                 return True
         return False
+    
+    def convert_tvl_from_usd(self, token_price_in_usd_timeseries, inplace=False):
+        this = self if inplace else self.copy()
+
+
+        price_index = token_price_in_usd_timeseries.index
+        for mkt in this.collection.keys():
+            mkt_index = this.collection[mkt].index
+            mkt_price = token_price_in_usd_timeseries[
+                token_price_in_usd_timeseries.index.isin(mkt_index)
+            ].copy()
+            for c in ["totalSupplyUsd", "totalBorrowUsd"]:
+                this.collection[mkt][c] = (
+                    this.collection[mkt][c] / mkt_price
+                )
+
+        return this
 
     def __repr__(self):
         keys_str = ", ".join([str(k) for k in self.collection.keys()])
@@ -275,14 +302,24 @@ class PriceRow:
 
 class PriceCollection(DataCollection):
     
+    def __init__(self, name, collection=None, base_token_name="dollar"):
+        super().__init__(name=name, collection=collection)
+        self.base_token_name = base_token_name
+    
+    def set_base_token_name(self, base_token_name):
+        self.base_token_name = base_token_name
+    
     def set_up_price_timeseries(self):
         warnings.simplefilter(action="ignore", category=FutureWarning)
         self._price = (
             pd.concat(self.collection).unstack(level=0).price.reset_index()
         )
+        self._price["dollar"] = 1
         warnings.simplefilter("default")
         self._price["date"] = pd.to_datetime(self._price.reset_index().date.dt.date)
         self._price = self._price.groupby("date").mean()
+        self._price = self._price.apply(lambda x: x/self._price[self.base_token_name])
+        return self._price
 
     def price_row_at(self, date_ix):
         row = self._price.loc[date_ix]
