@@ -10,9 +10,9 @@ def find_closest_rows(df, column_name, value):
 
     # Check if the value is less than the minimum or greater than the maximum
     if value <= df[column_name].iloc[0]:
-        return df.iloc[:1]
+        return df.iloc[:2]
     elif value >= df[column_name].iloc[-1]:
-        return df.iloc[-1:]
+        return df.iloc[-2:]
 
     # Find the two rows between which the value falls
     for i in range(1, len(df)):
@@ -21,12 +21,14 @@ def find_closest_rows(df, column_name, value):
 
 
 def interpolate_value(df, apy_col, ur_col, value):
+    """
+    It interpolates if value is between two values
+    otherwise it extrapolates
+    """
     rows = find_closest_rows(df, ur_col, value)
     if rows is None:
         return np.nan
-
-    if len(rows) == 1:
-        return (value / rows[ur_col] * rows[apy_col]).mean()
+    
 
     x0, y0 = rows[ur_col].iloc[0], rows[apy_col].iloc[0]
     x1, y1 = rows[ur_col].iloc[1], rows[apy_col].iloc[1]
