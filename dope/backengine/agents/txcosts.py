@@ -81,13 +81,13 @@ class LenderMIQP(BaseAgent):
         df = df[valid_cols]
 
         if self.vol_type == VolType.down:
-            cov = np.matrix(df[cov_filter].diff().clip(upper=0).cumsum().cov())
+            cov = df[cov_filter].diff().clip(upper=0).cumsum().cov().to_numpy()
         elif self.vol_type == VolType.up:
-            cov = np.matrix(df[cov_filter].diff().clip(lower=0).cumsum().cov())
+            cov = df[cov_filter].diff().clip(lower=0).cumsum().cov().to_numpy()
         else:
-            cov = np.matrix(df[cov_filter].cov())
+            cov = df[cov_filter].cov().to_numpy()
 
-        sigma = np.matrix(df[cov_filter].std()).reshape(-1, 1)
+        sigma = df[cov_filter].std().to_numpy().reshape(-1, 1)
         mus = df[mean_filter].mean().values
 
         inv_cov = cov  # np.linalg.inv(cov)
@@ -96,7 +96,7 @@ class LenderMIQP(BaseAgent):
         # deposit costs
         # c_deposit = self._get_depth_cost(date_ix)
 
-        iota = np.matrix(np.ones((len(cov), 1)))  # len(cov) = 8
+        iota = np.ones((len(cov), 1))  # len(cov) = 8
 
         my_capital = self.engine.get_capital(token=self.token)
 
@@ -163,7 +163,7 @@ class LenderMIQP(BaseAgent):
 
         rows = []
         LEN = len(keys)
-        for _ in range(100):
+        for _ in range(10):
             _ws = [np.random.rand(1)[0] for _ in range(LEN)]
             _sum = sum(_ws)
             _ws = [w / _sum for w in _ws]
@@ -317,14 +317,15 @@ class LenderMIQP(BaseAgent):
     def on_act(self, date_ix):
         """
         date_ix is the date index NOW.
-        One can think as the index of the filtration \mathcal{F}_{ix}, i.e.,
+        One can think as the index of the filtration $\\mathcal{F}_{ix}$, i.e.,
         the increasing sequence of information sets where the agent acts.
 
         """
         if self.triggers is not None:
             if date_ix not in self.triggers:
                 return self.ws
-        print("Acting....", date_ix)
+        if self.verbose:
+            print("Acting....", date_ix)
 
         self.opt_params = self._get_optimizer_params(date_ix)
         ws_list = self.optimum_allocation(self.opt_params, date_ix=date_ix, prec=None)
