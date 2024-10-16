@@ -93,3 +93,34 @@ class Plotter:
         plt.title(f"Risk vs Return")
         plt.show()
         print(returns.sort_values(ascending=False))
+    
+    def weights_timeseries(self, strategy_name, stack=True, token=None, figsize=(16, 4)):
+        
+        if token is None:
+            token = list(self.summary.ws.iloc[0,0].keys())
+            if len(token) == 0:
+                raise ValueError("No token found in the summary. Try to pass `token` variable to method",)
+            token = token[0]
+
+        if strategy_name not in self.summary.ws.columns:
+            raise ValueError(
+                f"Strategy {strategy_name} not found in the summary."
+                f" Available strategies are {self.summary.ws.columns}"
+            )
+        
+        colormap = plt.get_cmap('tab20')
+        plt.figure(figsize=figsize)
+        ax = plt.gca()
+        pd.json_normalize(
+            self.summary.ws[strategy_name].apply(lambda row: row[token])
+        ).plot(kind='area', stacked=stack, colormap=colormap, ax=ax)
+        
+        
+        _ = plt.legend(loc="upper left", bbox_to_anchor=(1, 1), title="Strategy")
+        # Remove the top and right spines
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+
+        # Optionally, you can also move the left and bottom spines
+        ax.spines["left"].set_position(("outward", 10))
+        ax.spines["bottom"].set_position(("outward", 10))
