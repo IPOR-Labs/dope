@@ -92,5 +92,4 @@ class Plotter:
 
         plt.title(f"Risk vs Return")
         plt.show()
-        print(returns)
-
+        print(returns.sort_values(ascending=False))
