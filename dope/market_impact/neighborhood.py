@@ -2,11 +2,13 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from collections import defaultdict
+from sklearn.linear_model import LinearRegression
 
 
 def find_closest_rows(df, column_name, value):
     # Ensure the DataFrame is sorted by the specified column
     df = df.sort_values(by=column_name)
+    #print(df[["apyBase", "utilizationRate"]])
 
     # Check if the value is less than the minimum or greater than the maximum
     if value <= df[column_name].iloc[0]:
@@ -20,21 +22,66 @@ def find_closest_rows(df, column_name, value):
             return df.iloc[i - 1 : i + 1]
 
 
-def interpolate_value(df, apy_col, ur_col, value):
+def old_interpolate_value(df, apy_col, ur_col, value):
     """
     It interpolates if value is between two values
     otherwise it extrapolates
     """
     rows = find_closest_rows(df, ur_col, value)
+    #print(rows[["apyBase", "utilizationRate"]])
     if rows is None:
         return np.nan
-    
+    if len(rows) == 1:
+        return np.nan
 
     x0, y0 = rows[ur_col].iloc[0], rows[apy_col].iloc[0]
     x1, y1 = rows[ur_col].iloc[1], rows[apy_col].iloc[1]
+    
+    #print(x0, y0, x1, y1, value)
 
     # Linear interpolation
     interpolated_value = y0 + (value - x0) * (y1 - y0) / (x1 - x0)
+
+    return interpolated_value
+
+
+
+
+def get_bias_slope(df, apy_col, ur_col, value):
+    # Ensure the DataFrame is sorted by the specified column
+    df = df.sort_values(by=ur_col)
+    #print(df[["apyBase", "utilizationRate"]])
+
+    # Check if the value is less than the minimum or greater than the maximum
+    if (value <= df[ur_col].iloc[0]) or (value >= df[ur_col].iloc[-1]):
+        X = df[ur_col].values.reshape(-1, 1)
+        y = df[apy_col].values
+        x0, y0 = df[ur_col].iloc[0], df[apy_col].iloc[0]
+        model = LinearRegression()
+        model.fit(X, y)
+
+        slope = model.coef_[0]
+        bias = model.intercept_
+
+        return 0, bias, slope
+
+    # Find the two rows between which the value falls
+    for i in range(1, len(df)):
+        if df[ur_col].iloc[i - 1] <= value <= df[ur_col].iloc[i]:
+            rows = df.iloc[i - 1 : i + 1]
+            x0, y0 = rows[ur_col].iloc[0], rows[apy_col].iloc[0]
+            x1, y1 = rows[ur_col].iloc[1], rows[apy_col].iloc[1]
+            
+            return x0, y0, (y1 - y0) / (x1 - x0)
+
+
+def interpolate_value(df, apy_col, ur_col, value):
+    """
+    It interpolates if value is between two values
+    otherwise it extrapolates
+    """
+    x0, y0, slope = get_bias_slope(df, apy_col, ur_col, value)
+    interpolated_value = y0 + (value - x0) * slope
 
     return interpolated_value
 
@@ -63,6 +110,7 @@ class NeighborhoodMktImpactModel:
         _filter &= self.data_ref.index <= end_index
 
         df = self.data_ref[_filter]
+
         return df
 
     def impact(self, timestamp, capital, is_borrow, should_plot=False):
@@ -71,7 +119,7 @@ class NeighborhoodMktImpactModel:
         """
 
         df = self.get_data_slice_for_date(timestamp)
-        if len(df) == 0:
+        if len(df) < 2:
             return np.nan
 
         _filter = self.data_ref.index <= timestamp
