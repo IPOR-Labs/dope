@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 
 from dope.market_impact.linear import LinearMktImpactModel
+from dope.market_impact.neighborhood import NeighborhoodMktImpactModel
 
 
 class TokenPortfolio:
@@ -53,17 +54,21 @@ class ArbBacktester:
         self.borrow_lend_data = borrow_lend_data
         if mkt_impact is None:
             mkt_impact = {
-                mkt: LinearMktImpactModel.zero_instance()
+                mkt: NeighborhoodMktImpactModel()
                 for data in self.data.values()
                 for mkt in data.keys()
             }
-            mkt_impact["cash"] = LinearMktImpactModel.zero_instance()
+            mkt_impact["cash"] = NeighborhoodMktImpactModel()
         self.mkt_impact = mkt_impact
         self.dates = self.get_dates()
         self.summary = None
 
         self.tokens = tokens or list(self.data.keys())
         self.πs = {token: TokenPortfolio() for token in self.tokens}
+    
+    def deposit_to_wallet(self, token, amount):
+        self.πs[token].rebalance({"cash": 1}, amount)
+        #self.πs[token].allocation["cash"] += amount
 
     def get_dates(self):
         dates = set()
@@ -102,6 +107,7 @@ class ArbBacktester:
         _days = len(self.dates)
         print(f"Running Backtest for {_days:,} | token:{self.strategy.token }")
         _tenpct = _days // 10
+        started = False
         for i in range(0, len(self.dates[:]) - 1):
             if i % _tenpct == 0:
                 print(f"{i:>10,}/{_days:>10,}", end="\r")
@@ -117,6 +123,10 @@ class ArbBacktester:
             # print(date_now)
             # The agent does not know the future.
             # print(date_now)
+            
+            if not started:
+                self.strategy.on_start(date_now)
+                started = True
 
             # Step 1: Position gets Accrued:
             for token, π in self.πs.items():
@@ -139,7 +149,6 @@ class ArbBacktester:
                         assert (
                             side_name != "apyBaseBorrow"
                         ), "Cannot Borrow from own wallet."
-
                     impacts[mkt] = self.mkt_impact[mkt].impact(
                         date_now, π.allocation.get(mkt, 0), is_borrow=is_borrow
                     )
@@ -151,7 +160,7 @@ class ArbBacktester:
                     if not np.isfinite(_rate):
                         continue
                     # print(mkt,"_rate", _rate, df[_filter][side_name].iloc[-1], impacts[mkt], π.allocation.get(mkt, 0) )
-                    r_breakdown[mkt] = _rate
+                    r_breakdown[mkt] = max(0, _rate)
 
                 π.compound(
                     r_breakdown,
