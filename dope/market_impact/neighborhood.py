@@ -54,8 +54,12 @@ def get_bias_slope(df, apy_col, ur_col, value):
 
     # Check if the value is less than the minimum or greater than the maximum
     if (value <= df[ur_col].iloc[0]) or (value >= df[ur_col].iloc[-1]):
-        X = df[ur_col].values.reshape(-1, 1)
-        y = df[apy_col].values
+        tmp = df[[ur_col, apy_col]].dropna()
+        X = tmp[ur_col].values.reshape(-1, 1)
+        y = tmp[apy_col].values
+        if len(tmp) < 1:
+            return 0, 0, 0
+            
         x0, y0 = df[ur_col].iloc[0], df[apy_col].iloc[0]
         model = LinearRegression()
         model.fit(X, y)
