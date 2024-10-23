@@ -54,11 +54,11 @@ class ArbBacktester:
         self.borrow_lend_data = borrow_lend_data
         if mkt_impact is None:
             mkt_impact = {
-                mkt: NeighborhoodMktImpactModel()
+                mkt: NeighborhoodMktImpactModel(past_window_days=7, future_window_days=3)
                 for data in self.data.values()
                 for mkt in data.keys()
             }
-            mkt_impact["cash"] = NeighborhoodMktImpactModel()
+            mkt_impact["cash"] = NeighborhoodMktImpactModel(past_window_days=7, future_window_days=3)
         self.mkt_impact = mkt_impact
         self.dates = self.get_dates()
         self.summary = None
