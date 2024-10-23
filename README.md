@@ -4,7 +4,7 @@
 
 Dope is a backtesting engine for DeFi, focusing on lending markets and yield protocols. 
 
-![dope](./images/dope.png)(https://github.com/IPOR-Labs/dope)
+[![dope](./images/dope.png)](https://github.com/IPOR-Labs/dope)
 
 
 Some of the common use cases of Dope are:
