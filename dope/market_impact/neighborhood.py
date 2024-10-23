@@ -53,22 +53,26 @@ def get_bias_slope(df, apy_col, ur_col, value):
     #print(df[["apyBase", "utilizationRate"]])
 
     # Check if the value is less than the minimum or greater than the maximum
-    if (value <= df[ur_col].iloc[0]) or (value >= df[ur_col].iloc[-1]):
-        tmp = df[[ur_col, apy_col]].dropna()
-        X = tmp[ur_col].values.reshape(-1, 1)
-        y = tmp[apy_col].values
-        if len(tmp) < 1:
-            return 0, 0, 0
-            
-        x0, y0 = df[ur_col].iloc[0], df[apy_col].iloc[0]
+    tmp = df[[ur_col, apy_col]].dropna()
+    if len(tmp) < 1:
+        return 0, 0, 0
+    model = None
+    if (value <= df[ur_col].iloc[0]):
+        X = tmp[ur_col][:3].values.reshape(-1, 1)
+        y = tmp[apy_col][:3].values
         model = LinearRegression()
+    elif (value >= df[ur_col].iloc[-1]):
+        X = tmp[ur_col][-3:].values.reshape(-1, 1)
+        y = tmp[apy_col][-3:].values
+        model = LinearRegression()
+
+    if model is not None:
         model.fit(X, y)
 
         slope = model.coef_[0]
         bias = model.intercept_
-
         return 0, bias, slope
-
+    x0, y0 = df[ur_col].iloc[0], df[apy_col].iloc[0]
     # Find the two rows between which the value falls
     for i in range(1, len(df)):
         if df[ur_col].iloc[i - 1] <= value <= df[ur_col].iloc[i]:
@@ -161,7 +165,7 @@ class NeighborhoodMktImpactModel:
     def plot(self, ur0, r0, ur1, r1, df):
         plt.figure(figsize=(20, 5))
         tmp = df.sort_values("utilizationRate")
-        plt.plot(tmp.utilizationRate, tmp.apyBase, linewidth=3)
+        plt.plot(tmp.utilizationRate, tmp.apyBase, ".-", linewidth=3)
 
         plt.scatter(ur0, r0, marker="o", color="tab:red")
         plt.scatter(ur1, r1, marker="o", color="tab:green")
