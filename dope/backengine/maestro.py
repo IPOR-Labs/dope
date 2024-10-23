@@ -239,8 +239,8 @@ class BackEngineMaestro:
         self.price_data_collection.set_base_token_name(self.base_token)
         self.price_data_collection.set_up_price_timeseries()
         
-        price_timeseries = self.price_data_collection._price[self.base_token]
-        self.rates_data_in_base_token = self.rates_data_collection.convert_tvl_from_usd(price_timeseries)
+        price_timeseries = self.price_data_collection._price["dollar"]
+        self.rates_data_in_base_token = self.rates_data_collection.convert_tvl_from_usd(1/price_timeseries)
 
     def set_data(self, borrow_lend_data: BacktestData):
         self.borrow_lend_data = borrow_lend_data

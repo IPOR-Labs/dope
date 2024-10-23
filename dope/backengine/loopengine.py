@@ -290,7 +290,6 @@ class LoopBacktester(TradeInterface):
                 r_by_weight[mkt] = sign * np.abs(ws_before.get(mkt, 0) * r_breakdown[mkt])
             rate = sum(r_by_weight.values())
 
-            rate = sum(r_by_weight.values())
             capital = self.π.capital(price_row)
             capital_breakdown = self.π.weights(price_row, normalize=False)
             health_factor = self.health_factor(price_row)

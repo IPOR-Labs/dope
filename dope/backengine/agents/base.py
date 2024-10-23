@@ -10,3 +10,9 @@ class BaseAgent:
     @property
     def data(self):
         return self.engine.borrow_lend_data
+    
+    def on_start(self, *args, **kwargs):
+        pass
+    
+    def on_act(self, *args, **kwargs):
+        pass

@@ -8,7 +8,7 @@ def total_collateral(n, X, ltv):
 def total_borrow(n, X, ltv):
     return X * (1-ltv**(n+1)) / (1- ltv) * ltv
 
-class Looper(BaseAgent):
+class PTLooper(BaseAgent):
 
     def __init__(self, capital, loop_n, buffer, pair_pool, deposit_pool, *args, **kwargs):
         super().__init__(capital=capital, *args, **kwargs)
@@ -71,14 +71,6 @@ class Looper(BaseAgent):
             )
 
         for _ in range(loop_times):
-            x = self.engine.add_deposit_token(pair_pool, x)
-            x = self.engine.take_debt_token(
-                pair_pool,
-                Token(
-                    x.value * (pair_pool.ltv - self.buffer), 
-                    name=pair_pool.debt_token
-                ),
-            )
             x = self.engine.add_deposit_token(deposit_pool, x)
             x = self.engine.take_debt_token(
                 deposit_pool, 
@@ -87,12 +79,16 @@ class Looper(BaseAgent):
                     name=deposit_pool.debt_token
                 )
             )
-            x = self.engine.swap(
-                x.value,
-                from_token=deposit_pool.debt_token,
-                to_token=pair_pool.deposit_token,
+
+            x = self.engine.add_deposit_token(pair_pool, x)
+            x = self.engine.take_debt_token(
+                pair_pool,
+                Token(
+                    x.value * (pair_pool.ltv - self.buffer), 
+                    name=pair_pool.debt_token
+                ),
             )
-        x = self.engine.add_deposit_token(pair_pool, x)
+        x = self.engine.add_deposit_token(deposit_pool, x)
 
     def on_start(self):
         self.do_loop(
