@@ -43,33 +43,48 @@ class LenderQuadratic(BaseAgent):
 
     def _get_optimizer_params(self, date_ix):
         rate_column = "apyBase"
-        df = pd.concat(self.data[self.token], names=["datetime"]).unstack(level=0)[
-            rate_column
-        ]
+        df = self.data.to_block(self.token)[rate_column]
+        # pd.concat(self.data[self.token], names=["datetime"]).unstack(level=0)[
+        #     rate_column
+        # ]
         # del df["cash"]
         df = df[df.index <= date_ix]
+
         mean_filter = df.index >= date_ix - pd.Timedelta(f"{self.mean_window}D")
         cov_filter = df.index >= date_ix - pd.Timedelta(f"{self.cov_window}D")
         if len(df) == 0:
             return None
-        sigma = np.matrix(df[cov_filter].std()).reshape(-1, 1)
-        mus = np.matrix(df[mean_filter].mean()).reshape(-1, 1)
-        cov = np.matrix(df[cov_filter].cov())
+        
+        mus = mus = df[mean_filter].mean()
+        valid_cols = list(mus[np.isfinite(mus)].index)
+        df = df[valid_cols]
+
+        sigma = df[cov_filter].std()
+        valid_cols = list(sigma[np.isfinite(sigma)].index)
+        df = df[valid_cols]
+        
+        sigma = np.array(df[cov_filter].std()).reshape(-1, 1)
+        mus = np.array(df[mean_filter].mean()).reshape(-1, 1)
+        cov = np.array(df[cov_filter].cov())
         inv_cov = cov  # np.linalg.inv(cov)
         corr_matrix = cov  # np.matrix(df[cov_filter].corr())
 
         # deposit costs
-        c_deposit = self._get_depth_cost(date_ix)
+        c_deposit = self._get_depth_cost(date_ix, df.columns)
 
-        iota = np.matrix(np.ones((len(cov), 1)))  # len(cov) = 8
+        iota = np.array(np.ones((len(cov), 1)))  # len(cov) = 8
 
         return LenderQuadraticParams(
             df.columns, sigma, mus, cov, inv_cov, corr_matrix, iota, c_deposit
         )
 
-    def _get_depth_cost(self, date_ix):
+    def _get_depth_cost(self, date_ix, valid_protocols=None):
         deposit_cost = []
+        if valid_protocols is None:
+            valid_protocols = list(self.data[self.token].keys())
         for protocol, df in self.data[self.token].items():
+            if protocol not in valid_protocols:
+                continue
             # if protocol == "cash":
             #   continue
             # extra interest rate per percentage point of utilization rate
@@ -89,12 +104,12 @@ class LenderQuadratic(BaseAgent):
             else:
                 c = (
                     self.capital
-                    / df[_filter][self.rate_column].resample("1D").mean()[-1]
+                    / df[_filter][self.rate_column].resample("1D").mean().iloc[-1]
                     * slope
                 )
             deposit_cost.append(c)
 
-        return np.matrix(deposit_cost).reshape(-1, 1)
+        return np.array(deposit_cost).reshape(-1, 1)
         # return np.ones(n) *  deposit_cost
 
     def optimum_allocation(self, params, prec=None):
@@ -115,7 +130,7 @@ class LenderQuadratic(BaseAgent):
         max_weight = 1
         r = opt.matrix(np.block([params.mus - params.c_deposit]))
 
-        print("r", r)
+        #print("r", r)
 
         A = opt.matrix(
             np.block(
@@ -165,15 +180,15 @@ class LenderQuadratic(BaseAgent):
     def on_act(self, date_ix):
         """
         date_ix is the date index NOW.
-        One can think as the index of the filtration \mathcal{F}_{ix}, i.e.,
+        One can think as the index of the filtration $\\mathcal{F}_{ix}$, i.e.,
         the increasing sequence of information sets where the agent acts.
 
         """
-        self._get_depth_cost(date_ix)
         opt_params = self._get_optimizer_params(date_ix)
         self.opt_params = opt_params
         ws_list = self.optimum_allocation(opt_params, prec=None)
-        print("ws:", ws_list)
-        ws = {self.opt_params.columns[i]: ws_list[i][0] for i in range(len(ws_list))}
+        self.ws_list = ws_list
+        # print("ws:", ws_list)
+        ws = {self.opt_params.columns[i]: abs(ws_list[i]) for i in range(len(ws_list))}
 
         return {self.token: ws}
