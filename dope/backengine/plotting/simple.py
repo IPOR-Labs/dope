@@ -97,7 +97,7 @@ class Plotter:
     def weights_timeseries(self, strategy_name, stack=True, token=None, figsize=(16, 4)):
         
         if token is None:
-            token = list(self.summary.ws.iloc[0,0].keys())
+            token = list(self.summary.ws.dropna().iloc[0,0].keys())
             if len(token) == 0:
                 raise ValueError("No token found in the summary. Try to pass `token` variable to method",)
             token = token[0]
