@@ -110,13 +110,14 @@ class Plotter:
         
         colormap = plt.get_cmap('tab20')
         plt.figure(figsize=figsize)
+        plt.title("Weights Timeseries")
         ax = plt.gca()
         pd.json_normalize(
             self.summary.ws[strategy_name].apply(lambda row: row[token])
         ).plot(kind='area', stacked=stack, colormap=colormap, ax=ax)
         
         
-        _ = plt.legend(loc="upper left", bbox_to_anchor=(1, 1), title="Strategy")
+        _ = plt.legend(loc="upper left", bbox_to_anchor=(1, 1), title="Pools")
         # Remove the top and right spines
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
