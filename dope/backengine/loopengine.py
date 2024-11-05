@@ -129,7 +129,9 @@ class LoopBacktester(TradeInterface):
         data,
         price_data,
         pools,
-        mkt_impact=None
+        mkt_impact=None,
+        add_reward_deposit=False,
+        add_reward_borrow=False,
     ):
         self.strategy = strategy
         self.data = data
@@ -142,6 +144,8 @@ class LoopBacktester(TradeInterface):
         self.summary = None
         self.date_now = None
 
+        self.add_reward_deposit = add_reward_deposit
+        self.add_reward_borrow = add_reward_borrow
         self.π = TokenPortfolio()
 
     def get_time(self):
@@ -207,6 +211,10 @@ class LoopBacktester(TradeInterface):
                 if not np.isfinite(_rate):
                     continue
 
+                if self.add_reward_borrow:
+                    reward_name = "apyRewardBorrow"
+                    _rate -= df[_filter][reward_name].iloc[-1]
+
                 r_breakdown[account.pool.debt_name] = -_rate
 
             if account.pool.deposit_pool_id is not None:
@@ -227,7 +235,11 @@ class LoopBacktester(TradeInterface):
                     _rate = df[_filter][side_name].iloc[-1] + impacts[pool_id]
                 if not np.isfinite(_rate):
                     continue
-                
+
+                if self.add_reward_deposit:
+                    reward_name = "apyReward"
+                    _rate += df[_filter][reward_name].iloc[-1]
+
                 r_breakdown[account.pool.deposit_name] = _rate
 
         return r_breakdown, impacts
@@ -272,7 +284,8 @@ class LoopBacktester(TradeInterface):
                 self.strategy.on_start()
                 did_start = True
                 continue
-            # print("@", date_now, price_row)
+            # print("@", self.date_now, price_row, self.π.accounts)
+            # print()
 
             # Step 1: Accounts gets Accrued:
             ws_before = self.π.weights(price_row)
@@ -310,7 +323,6 @@ class LoopBacktester(TradeInterface):
 
             # Step 2: Strategy Acts
             ws = self.strategy.on_act()
-            
 
             # step 3: Rebalance
             
