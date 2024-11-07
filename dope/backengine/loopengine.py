@@ -32,8 +32,10 @@ class PoolAccount:
         # print(protocol_rate_dict)
         # print(f"Before Compound", self.debt, self.deposit)
         if self.pool.debt_pool_id is not None:
+            # debt_rate is assumed to be negative for borrowing.
+            # i.e., 10% borrow costs means debt_rate == -10
             debt_rate = np.abs(protocol_rate_dict.get(self.pool.debt_name, 0))
-            self.debt = self.debt * (1 + debt_rate / 100 * dt)
+            self.debt = self.debt * (1 - debt_rate / 100 * dt)
         if self.pool.deposit_pool_id is not None:
             deposit_rate = protocol_rate_dict.get(self.pool.deposit_name, 0)
             self.deposit = self.deposit * (1 + deposit_rate / 100 * dt)
