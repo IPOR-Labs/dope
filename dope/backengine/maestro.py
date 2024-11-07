@@ -200,12 +200,24 @@ class BackEngineMaestro:
             if not self.rates_data_collection.id_isin(pool.debt_pool_id):
                 pool_name_debt, borrow_lend_data = self.data_loader.load_one_from_defi_llama(pool.debt_pool_id)
                 self.rates_data_collection.add(pool_name_debt, borrow_lend_data)
-                pool.debt_rate_keyid = pool_name_debt
+            else:
+                for k in self.rates_data_collection.collection.keys():
+                    if pool.debt_pool_id in k.pool_id:
+                        pool_name_debt = k
+                # print("pool_name_debt", pool_name_debt)
+            pool.debt_rate_keyid = pool_name_debt
+            
         if pool.deposit_pool_id is not None:
             if not self.rates_data_collection.id_isin(pool.deposit_pool_id):
                 pool_name_deposit, borrow_lend_data = self.data_loader.load_one_from_defi_llama(pool.deposit_pool_id)
                 self.rates_data_collection.add(pool_name_deposit, borrow_lend_data)
-                pool.deposit_rate_keyid = pool_name_deposit
+                
+            else:
+                for k in self.rates_data_collection.collection.keys():
+                    if pool.deposit_pool_id in k.pool_id:
+                        pool_name_deposit = k
+                # print("pool_name_deposit", pool_name_deposit)
+            pool.deposit_rate_keyid = pool_name_deposit
         return pool
     
     def load_pools_data(self, pools: list[Pool]):

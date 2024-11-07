@@ -221,6 +221,14 @@ class DataCollection:
             if key in k.pool_id:
                 return True
         return False
+
+    def as_block(self):
+        warnings.simplefilter(action="ignore", category=FutureWarning)
+        ret_df = pd.concat(
+            self.collection, names=["datetime"]
+        ).unstack(level=0)
+        warnings.simplefilter("default")
+        return ret_df
     
     def convert_tvl_from_usd(self, token_price_in_usd_timeseries, inplace=False):
         this = self if inplace else self.copy()

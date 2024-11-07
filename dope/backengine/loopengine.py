@@ -81,18 +81,33 @@ class TokenPortfolio:
             total_capital += deposit - debt
 
         return total_capital
+    
+    def weights(self, price_row):
+        return self.get_allocation(price_row, normalize=True)
+    
+    def capital_allocation(self, price_row):
+        return self.get_allocation(price_row, normalize=False)
+    
+    def token_allocation(self, price_row):
+        return self.get_allocation(price_row, normalize=False, is_token_amount=True)
 
-    def weights(self, price_row, normalize=True):
+    def get_allocation(self, price_row, normalize=True, is_token_amount=False):
         allocation = {}
         total_capital = 0
         for account in self.accounts.values():
-            deposit_value = account.deposit_value(price_row)
-            debt_value = account.debt_value(price_row)
+            deposit_value = account.deposit_value(price_row) if not is_token_amount else account.deposit.value
+            debt_value = account.debt_value(price_row) if not is_token_amount else account.debt.value
             total_capital += deposit_value - debt_value
             debt_key = account.pool.debt_name
             deposit_key = account.pool.deposit_name
-            allocation[deposit_key] = deposit_value
-            allocation[debt_key] = -debt_value
+            if deposit_key not in allocation:
+                allocation[deposit_key] = deposit_value
+            else: 
+                allocation[deposit_key] += deposit_value
+            if debt_key not in allocation:
+                allocation[debt_key] = -debt_value
+            else:
+                allocation[debt_key] -= debt_value
 
         if normalize:
             allocation = {k: v / total_capital for k, v in allocation.items()}
@@ -114,11 +129,18 @@ class TradeInterface:
     def take_debt_token(self, pool, capital):
         return self.π.take_debt_token(pool, capital)
     
-    def weights(self, price_row, normalize=True):
-        return self.π.weights(price_row, normalize=normalize)
+    def weights(self, price_row):
+        return self.π.weights(price_row)
+    
+    def capital_allocation(self, price_row):
+        return self.π.get_allocation(price_row, normalize=False)
     
     def capital(self, price_row):
         return self.π.capital(price_row)
+    
+    def price_of_token(self, token_name):
+        price_row = self.price_data.price_row_at(self.date_now)
+        return price_row.get(token_name)
 
 
 class LoopBacktester(TradeInterface):
@@ -191,6 +213,9 @@ class LoopBacktester(TradeInterface):
         impacts = {}
         
         for account in self.π.accounts.values():
+            # print(">>",account)
+            # print("account.pool.debt_pool_id:", account.pool.debt_pool_id)
+            
             if account.pool.debt_pool_id is not None:
                 df = self.data[account.pool.debt_rate_keyid]
                 side_name = "apyBaseBorrow"
@@ -216,7 +241,7 @@ class LoopBacktester(TradeInterface):
                     _rate -= df[_filter][reward_name].iloc[-1]
 
                 r_breakdown[account.pool.debt_name] = -_rate
-
+            # print("account.pool.deposit_pool_id:", account.pool.deposit_pool_id)
             if account.pool.deposit_pool_id is not None:
                 df = self.data[account.pool.deposit_rate_keyid]
                 side_name = "apyBase"
@@ -241,6 +266,9 @@ class LoopBacktester(TradeInterface):
                     _rate += df[_filter][reward_name].iloc[-1]
 
                 r_breakdown[account.pool.deposit_name] = _rate
+            # print()
+            # print(r_breakdown)
+            # print()
 
         return r_breakdown, impacts
 
@@ -304,17 +332,20 @@ class LoopBacktester(TradeInterface):
             rate = sum(r_by_weight.values())
 
             capital = self.π.capital(price_row)
-            capital_breakdown = self.π.weights(price_row, normalize=False)
+            capital_breakdown = self.π.capital_allocation(price_row)
+            token_breakdown = self.π.token_allocation(price_row)
             health_factor = self.health_factor(price_row)
-            if len(self.π.weights(price_row)) > 0:
+            π_weights = self.π.weights(price_row)
+            if len(π_weights) > 0:
                 rows.append(
                     [
                         self.date_now,
-                        self.π.weights(price_row),
+                        π_weights,
                         rate,
                         health_factor,
                         capital,
                         capital_breakdown,
+                        token_breakdown,
                         r_breakdown,
                         r_by_weight,
                         impact_breakdown,
@@ -335,6 +366,7 @@ class LoopBacktester(TradeInterface):
                 "health_factor",
                 "capital",
                 "capital_breakdown",
+                "token_breakdown",
                 "r_breakdown",
                 "r_by_weight",
                 "impact_breakdown",
