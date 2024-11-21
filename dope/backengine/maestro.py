@@ -6,7 +6,7 @@ from enum import Enum
 import matplotlib.pyplot as plt
 from collections import defaultdict
 
-
+from dope.fetcher.llama import Llama
 from dope.market_impact.linear import LinearMktImpactModel
 from dope.market_impact.neighborhood import NeighborhoodMktImpactModel
 from dope.backengine.backtestdata import BacktestData, DataCollection, PriceCollection
@@ -225,22 +225,63 @@ class BackEngineMaestro:
             pool = self.load_pool_data(p)
             self.pools[pool] = pool
         return self.pools
+
+    def _load_wsteth_normalized(self, mkt_price_data):
+        """
+        This function loads the wstETH "price" using the actual lido rates 
+        but the starting price of wstETH mkt prices.
+        This removes the mkt fluctuations that in practice are not real 
+        because an actual strategy would lock/unlock from lido protocol.
+        """
+        
+        llama = Llama()
+        # lido pool ID: "747c1d2a-c668-4682-b9f9-296708a3dd90"
+        lido = llama.lend_rate("747c1d2a-c668-4682-b9f9-296708a3dd90")
+        if "ETH" in self.price_data_collection.keys():
+            eth_price = self.price_data_collection["ETH"]
+        elif "WETH" in self.price_data_collection.keys():
+            eth_price = self.price_data_collection["WETH"]
+        else:
+            eth_price = CoinGecko().get_last_year_price("ethereum")
+            self.price_data_collection.add("ETH", eth_price)
+
+        first_price = (mkt_price_data/eth_price).iloc[:1]
+        apy = lido[lido.index >= first_price.index[0]].apy
+
+        ret_df = pd.DataFrame((first_price.iloc[0].price
+            * (np.exp(np.log((apy/100/365)+1).cumsum()).shift(1).fillna(1))
+        ).resample("1D").last().ffill().dropna()).rename(columns={"apy":"price"})
+
+        return ret_df * eth_price
     
     def load_price_data(self, pools: list[Pool]):
         
         cg = CoinGecko()
-        for p in pools:
-            if p.deposit_token_keyid is None:
-                continue
-            if p.deposit_token not in self.price_data_collection.collection:
-                price_data = cg.get_last_year_price(p.deposit_token_keyid)
-                self.price_data_collection.add(p.deposit_token, price_data)
+
         for p in pools:
             if p.debt_token_keyid is None:
                 continue
             if p.debt_token not in self.price_data_collection.collection:
                 price_data = cg.get_last_year_price(p.debt_token_keyid)
-                self.price_data_collection.add(p.debt_token, price_data)
+                if p.debt_token_keyid == "wrapped-steth":
+                    self.price_data_collection.add("mkt-"+p.debt_token, price_data)
+                    price_data = self._load_wsteth_normalized(price_data)
+                    self.price_data_collection.add(p.debt_token, price_data)
+                else:
+                    self.price_data_collection.add(p.debt_token, price_data)
+
+        for p in pools:
+            if p.deposit_token_keyid is None:
+                continue
+            if p.deposit_token not in self.price_data_collection.collection:
+                price_data = cg.get_last_year_price(p.deposit_token_keyid)
+                if p.deposit_token_keyid == "wrapped-steth":
+                    self.price_data_collection.add("mkt-"+p.deposit_token, price_data)
+                    price_data = self._load_wsteth_normalized(price_data)
+                    self.price_data_collection.add(p.deposit_token, price_data)
+                else:
+                    self.price_data_collection.add(p.deposit_token, price_data)
+        
     
     def set_base_token(self, token_name):
         self.base_token = token_name
