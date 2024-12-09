@@ -31,8 +31,8 @@ class StepLooper(BaseAgent):
     def leverage_from_loops(cls, loops, start_pool):
         LTV = start_pool.ltv
         n = loops
-        A = 1 - (start_pool.ltv)**(n + 1)
-        B = 1 - start_pool.ltv
+        A = 1 - (LTV)**(n + 1)
+        B = 1 - LTV
         return A / B 
     
     @classmethod

@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 
+from dope.backengine.backtestdata import PriceRow
+from dope.backengine.loop_status_event import StatusEvent
 from dope.market_impact.linear import LinearMktImpactModel
 from dope.market_impact.neighborhood import NeighborhoodMktImpactModel
 from dope.pools.pools import Pool
@@ -34,12 +36,13 @@ class PoolAccount:
         if self.pool.debt_pool_id is not None:
             # debt_rate is assumed to be negative for borrowing.
             # i.e., 10% borrow costs means debt_rate == -10
-            debt_rate = np.abs(protocol_rate_dict.get(self.pool.debt_name, 0))
+            debt_rate = protocol_rate_dict.get(self.pool.debt_name, 0)
             self.debt = self.debt * (1 - debt_rate / 100 * dt)
+            # print(f"Debt Rate: {debt_rate}")
         if self.pool.deposit_pool_id is not None:
             deposit_rate = protocol_rate_dict.get(self.pool.deposit_name, 0)
             self.deposit = self.deposit * (1 + deposit_rate / 100 * dt)
-        #     print(f"Deposit Rate: {deposit_rate}")
+            # print(f"Deposit Rate: {deposit_rate}")
         # print("After Compound", self.debt, self.deposit)
         # print()
 
@@ -156,12 +159,31 @@ class LoopBacktester(TradeInterface):
         mkt_impact=None,
         add_reward_deposit=False,
         add_reward_borrow=False,
+        mkt_impact_mode = "past",
     ):
+        """
+        mkt_impact is ignored if mkt_impact_mode is set to "past", "linear", or "zero".
+        
+        mkt_impact_mode in ["past", "linear", "zero", "custom"], 
+        Where 
+         "past" uses the neighborhood model, 
+         "linear" uses the linear model, and
+         "zero" uses no impact model. 
+         "custom" (or anything else) uses the model under the mkt_impact parameter.
+
+        """
         self.strategy = strategy
         self.data = data
         self.price_data = price_data
-        if mkt_impact is None:
+        if mkt_impact_mode == "past":
             mkt_impact = {mkt:NeighborhoodMktImpactModel() for mkt in self.data.keys()}
+        elif mkt_impact_mode == "linear":
+            mkt_impact = {mkt:LinearMktImpactModel() for mkt in self.data.keys()}
+        elif mkt_impact_mode == "zero":
+            mkt_impact = {mkt:LinearMktImpactModel.zero_instance() for mkt in self.data.keys()}
+        else:
+            assert mkt_impact is not None, "mkt_impact must be provided if mkt_impact_mode is not 'past', 'linear', or 'zero'"
+
         self.mkt_impact = mkt_impact
         self.pools = pools
         self.dates = self.get_dates()
@@ -273,6 +295,34 @@ class LoopBacktester(TradeInterface):
             # print()
 
         return r_breakdown, impacts
+    
+    def base_state_event(self):
+        date_ix = self.date_now
+        price_row: PriceRow = self.price_now
+
+        π_weights = self.π.weights(price_row)
+        capital = self.π.capital(price_row)
+        health_factor = self.health_factor(price_row)
+        token_breakdown = self.π.token_allocation(price_row)
+        capital_breakdown = self.π.capital_allocation(price_row)
+        r_breakdown, impact_breakdown = (
+            self.rates_to_compound(date_ix, price_row=price_row)
+        )
+        
+        base_event = StatusEvent(
+            datetime=date_ix,
+            weights=π_weights,
+            rate=np.nan,
+            health_factor=health_factor,
+            capital=capital,
+            capital_breakdown=capital_breakdown,
+            token_breakdown=token_breakdown,
+            r_breakdown=r_breakdown,
+            r_by_weight=np.nan,
+            impact_breakdown=impact_breakdown,
+            prices=price_row.row.to_dict()
+        )
+        return base_event
 
     def __call__(self, start_timestamp=None, end_timestamp=None):
 
@@ -287,7 +337,7 @@ class LoopBacktester(TradeInterface):
 
         self.prep()  # register data, slippage model, strategy
 
-        rows = []
+        self.event_history = []
         _days = len(self.dates)
         print(f"Running Backtest for {_days:,}")
 
@@ -305,7 +355,7 @@ class LoopBacktester(TradeInterface):
             if self.date_now >= end_timestamp:
                 break
             try:
-                price_row = self.price_data.price_row_at(self.date_now)
+                self.price_now = self.price_data.price_row_at(self.date_now)
             except KeyError:
                 if did_start:
                     print("Don't have price data for ", self.date_now, "skipping")
@@ -313,15 +363,19 @@ class LoopBacktester(TradeInterface):
             if not did_start:
                 self.strategy.on_start()
                 did_start = True
+
+                status_event: StatusEvent = self.base_state_event()
+                self.event_history.append(status_event.as_row())
+
                 continue
             # print("@", self.date_now, price_row, self.π.accounts)
             # print()
 
             # Step 1: Accounts gets Accrued:
-            ws_before = self.π.weights(price_row)
+            ws_before = self.π.weights(self.price_now)
 
             r_breakdown, impact_breakdown = (
-                self.rates_to_compound(self.date_now, price_row=price_row)
+                self.rates_to_compound(self.date_now, price_row=self.price_now)
             )
 
             dt = (self.date_now - date_prev).total_seconds() / 365 / 24 / 3600
@@ -333,26 +387,13 @@ class LoopBacktester(TradeInterface):
                 r_by_weight[mkt] = sign * np.abs(ws_before.get(mkt, 0) * r_breakdown[mkt])
             rate = sum(r_by_weight.values())
 
-            capital = self.π.capital(price_row)
-            capital_breakdown = self.π.capital_allocation(price_row)
-            token_breakdown = self.π.token_allocation(price_row)
-            health_factor = self.health_factor(price_row)
-            π_weights = self.π.weights(price_row)
+            π_weights = self.π.weights(self.price_now)
             if len(π_weights) > 0:
-                rows.append(
-                    [
-                        self.date_now,
-                        π_weights,
-                        rate,
-                        health_factor,
-                        capital,
-                        capital_breakdown,
-                        token_breakdown,
-                        r_breakdown,
-                        r_by_weight,
-                        impact_breakdown,
-                    ]
-                )
+                base_event = self.base_state_event()
+                base_event.rate = rate
+                base_event.r_by_weight = r_by_weight
+                
+                self.event_history.append( base_event.as_row() )
 
             # Step 2: Strategy Acts
             ws = self.strategy.on_act()
@@ -360,19 +401,8 @@ class LoopBacktester(TradeInterface):
             # step 3: Rebalance
             
         strategy = pd.DataFrame(
-            rows,
-            columns=[
-                "datetime",
-                "ws",
-                "rate",
-                "health_factor",
-                "capital",
-                "capital_breakdown",
-                "token_breakdown",
-                "r_breakdown",
-                "r_by_weight",
-                "impact_breakdown",
-            ],
+            self.event_history,
+            columns=StatusEvent.columns(),
         )
         strategy = strategy.set_index("datetime")
         self.summary = strategy

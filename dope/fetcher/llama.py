@@ -43,6 +43,10 @@ class Llama:
         )
         df["utilizationRate"] = df["totalBorrowUsd"] / df["totalSupplyUsd"]
 
+        for col in ["apyReward", "apyRewardBorrow"]:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col]).fillna(0)
+
         return df
 
     def load_data_for_asset(

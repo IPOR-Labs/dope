@@ -77,10 +77,14 @@ class OnePoolLooper(BaseAgent):
                 to_token=pair_pool.deposit_token,
             )
             x = self.engine.add_deposit_token(pair_pool, x)
+            price_deposit = self.engine.price_of_token(pair_pool.deposit_token)
+            price_debt = self.engine.price_of_token(pair_pool.debt_token)
+            price = price_deposit / price_debt
+            
             x = self.engine.take_debt_token(
                 pair_pool,
                 Token(
-                    x.value * (pair_pool.ltv - self.buffer), 
+                    x.value * price * (pair_pool.ltv - self.buffer), 
                     name=pair_pool.debt_token
                 ),
             )
@@ -99,6 +103,11 @@ class OnePoolLooper(BaseAgent):
                 to_token=pair_pool.deposit_token,
             )
         x = self.engine.add_deposit_token(pair_pool, x)
+        
+        if self.verbose:
+            print("Account after loop:")
+            print(self.engine.π.accounts)
+            
 
     def on_start(self):
         self.do_loop(
