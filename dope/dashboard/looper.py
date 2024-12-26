@@ -123,11 +123,13 @@ class LoopDashboard:
 
   def on_change(self, return_raw=False):
       self.is_running_label.value = "Running..."
+      self.params["leverage"] = min(self.level_caps[self.params["loop"]], self.params["leverage"])
       self.df = self.model(**self.params)
       if return_raw:
         self.is_running_label.value = "Done"
         return self.df
       self.df = self.df.resample("1D").last()
+      self.leverage_slider.max = self.level_caps[self.params["loop"]]
 
       self.update_timeseries(self.timeseries_fig, self.df) 
       self.is_running_label.value = "Done"
@@ -280,8 +282,9 @@ class LoopDashboard:
   def setup(self):
 
     label = widgets.Label(value="Moving Avg. Window (days)")
+    self.leverage_slider = self.get_k_spread("Leverage", "leverage", value=self.params["leverage"], _max=self.level_caps[self.params["loop"]], step=0.05, orientation="horizontal" )
     mavg_sliders = [
-      self.get_k_spread("Leverage", "leverage", value=self.params["leverage"], _max=self.level_caps[self.params["loop"]], step=0.05, orientation="horizontal" ),
+      self.leverage_slider,
       self.get_mvag_slider("Moving Avg.", "mavg"),  
       ]
     

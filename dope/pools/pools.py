@@ -39,10 +39,10 @@ class Pool:
         self.debt_pool_id = debt_pool_id
     
     def __repr__(self):
-        debt_str = f"{self.debt_token}({str(self.debt_pool_id)[:10]})"
-        deposit_str = f"{self.deposit_token}({str(self.deposit_pool_id)[:10]})"
+        debt_str = f"{self.debt_token}({str(self.debt_pool_id)[:8]})"
+        deposit_str = f"{self.deposit_token}({str(self.deposit_pool_id)[:8]})"
         return f"{self.chain}:{self.protocol}:(debt:{debt_str}, deposit:{deposit_str})"
-    
+ 
     @property
     def debt_name(self):
         return f"{self.debt_token}({self.debt_pool_id})"

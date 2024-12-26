@@ -233,10 +233,19 @@ class BackEngineMaestro:
         This removes the mkt fluctuations that in practice are not real 
         because an actual strategy would lock/unlock from lido protocol.
         """
+        return self._load_lst_normalized(mkt_price_data, "747c1d2a-c668-4682-b9f9-296708a3dd90")
+        
+
+    def _load_lst_normalized(self, mkt_price_data, project_yield_id ):
+        """
+        This function loads the lst "price" using the actual lst rates 
+        but the starting price of lst mkt prices.
+        This removes the mkt fluctuations that in practice are not real 
+        because an actual strategy would lock/unlock from lido protocol.
+        """
         
         llama = Llama()
-        # lido pool ID: "747c1d2a-c668-4682-b9f9-296708a3dd90"
-        lido = llama.lend_rate("747c1d2a-c668-4682-b9f9-296708a3dd90")
+        lst = llama.lend_rate(project_yield_id)
         if "ETH" in self.price_data_collection.keys():
             eth_price = self.price_data_collection["ETH"]
         elif "WETH" in self.price_data_collection.keys():
@@ -246,7 +255,7 @@ class BackEngineMaestro:
             self.price_data_collection.add("ETH", eth_price)
 
         first_price = (mkt_price_data/eth_price).iloc[:1]
-        apy = lido[lido.index >= first_price.index[0]].apy
+        apy = lst[lst.index >= first_price.index[0]].apy
 
         ret_df = pd.DataFrame((first_price.iloc[0].price
             * (np.exp(np.log((apy/100/365)+1).cumsum()).shift(1).fillna(1))
@@ -257,15 +266,21 @@ class BackEngineMaestro:
     def load_price_data(self, pools: list[Pool]):
         
         cg = CoinGecko()
+        
+        lst_token_yield_id = {
+            "wrapped-steth": "747c1d2a-c668-4682-b9f9-296708a3dd90", # wstETH
+            "coinbase-wrapped-staked-eth": "0f45d730-b279-4629-8e11-ccb5cc3038b4", # cbETH
+            "rocket-pool-eth": "d4b3c522-6127-4b89-bedf-83641cdcd2eb", # rETH
+        }
 
         for p in pools:
             if p.debt_token_keyid is None:
                 continue
             if p.debt_token not in self.price_data_collection.collection:
                 price_data = cg.get_last_year_price(p.debt_token_keyid)
-                if p.debt_token_keyid == "wrapped-steth":
+                if p.debt_token_keyid in lst_token_yield_id.keys(): #["wrapped-steth"]:
                     self.price_data_collection.add("mkt-"+p.debt_token, price_data)
-                    price_data = self._load_wsteth_normalized(price_data)
+                    price_data = self._load_lst_normalized(price_data, lst_token_yield_id[p.debt_token_keyid])
                     self.price_data_collection.add(p.debt_token, price_data)
                 else:
                     self.price_data_collection.add(p.debt_token, price_data)
@@ -275,9 +290,9 @@ class BackEngineMaestro:
                 continue
             if p.deposit_token not in self.price_data_collection.collection:
                 price_data = cg.get_last_year_price(p.deposit_token_keyid)
-                if p.deposit_token_keyid == "wrapped-steth":
+                if p.deposit_token_keyid in lst_token_yield_id.keys():
                     self.price_data_collection.add("mkt-"+p.deposit_token, price_data)
-                    price_data = self._load_wsteth_normalized(price_data)
+                    price_data = self._load_lst_normalized(price_data, lst_token_yield_id[p.deposit_token_keyid])
                     self.price_data_collection.add(p.deposit_token, price_data)
                 else:
                     self.price_data_collection.add(p.deposit_token, price_data)

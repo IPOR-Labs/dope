@@ -16,39 +16,35 @@ class LoopModel:
         
         add_rewards = True
         for k, p in pool_dict.items():
+            price_data_collection.set_base_token_name(p.debt_token)
+            price_data_collection.set_up_price_timeseries()
     
             debt = rates_data_collection[p.debt_rate_keyid].apyBaseBorrow
+            debt_token_price = price_data_collection._price[p.debt_token]
             debt_token_ret = ( (
-                price_data_collection._price[p.debt_token]
-                / price_data_collection._price[p.debt_token].shift()
-            ) - 1 ) * 365 * 100
+                debt_token_price
+                / debt_token_price.shift()
+            ) - 1 )  * 100 * 365
 
             if add_rewards:
                 debt = (
                     rates_data_collection[p.debt_rate_keyid].apyBaseBorrow
                     + rates_data_collection[p.debt_rate_keyid].apyRewardBorrow
-                    + debt_token_ret
-                )
-            else:
-                debt = debt + debt_token_ret
+                )            
+            debt = (((1+debt/100/365) * (1+debt_token_ret/100/365))-1)*100*365
 
-            
             deposit = rates_data_collection[p.deposit_rate_keyid].apyBase
-            deposit_token_ret = ( (
-                price_data_collection._price[p.deposit_token]
-                / price_data_collection._price[p.deposit_token].shift()
-            ) - 1 ) * 365 * 100
+            deposit_token_price = price_data_collection._price[p.deposit_token]
+            deposit_token_ret = ( (deposit_token_price / deposit_token_price.shift()) - 1 ) * 100 * 365
             
             
             if add_rewards:
                 deposit = (
                     rates_data_collection[p.deposit_rate_keyid].apyBase
                     + rates_data_collection[p.deposit_rate_keyid].apyReward
-                    + deposit_token_ret
                 )
-            else:
-                deposit = deposit + deposit_token_ret
-                
+            deposit = (((1+deposit/100/365) * (1+deposit_token_ret/100/365))-1)*100*365
+
             df = pd.DataFrame()
             df["debt"] = debt
             df["deposit"] = deposit
