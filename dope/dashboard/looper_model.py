@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 from dope.backengine.backtestdata import DataCollection, PriceCollection
 
@@ -69,5 +70,14 @@ class LoopModel:
         data.index = pd.to_datetime(data.index)
         data["apyLoop"] = apyLoop
         data["Mvg. Avg."] = (apyLoop).rolling(timewindow).mean()
+        
+        dt = data.index.diff().mean().total_seconds()
+        dt = dt / (60 * 60 * 24)
+        
+        window_size = int(30 * dt)
+
+        data["cumLoopApy"] = (np.exp(np.log(1+data['apyLoop']/100 * 1/365 ).cumsum()) - 1)*100
+        data['roll_max'] = data['cumLoopApy'].rolling(window=window_size).max()
+        data['drawdown'] = (data['cumLoopApy'] - data['roll_max'])
     
         return data.ffill()

@@ -60,15 +60,19 @@ class LoopDashboard:
     
   
   def get_timeseries_fig(self, title="Looping APY Timeseries"):
-    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
+    fig = make_subplots(rows=4, cols=1, shared_xaxes=True, 
                     vertical_spacing=0.05, # subplot_titles=(title, "Leverage"),
-                    row_heights=[0.7, 0.3])
+                    row_heights=[0.5, 0.25, 0.25, 0.25])
     fig = go.FigureWidget(fig)  # Ensure it's a FigureWidget for dynamic updates
-    fig.update_layout(title_text=title, height=500, width=950)
+    fig.update_layout(title_text=title, height=850, width=950)
     #fig.update_yaxes(range=[0, int(self.leverage_params["cap"]*1.1)], row=2, col=1)
     # y label:
     fig.update_yaxes(title_text="APY", row=1, col=1)
-    fig.update_xaxes(title_text="Date", row=2, col=1)
+    fig.update_xaxes(title_text="Date", row=4, col=1)
+    fig.update_yaxes(title_text="Cum. Returns (%)", row=2, col=1)
+    fig.update_yaxes(title_text="30 Days<BR> Drawdown (%)", row=3, col=1)
+    fig.update_yaxes(title_text="Flat Returns <BR>Debt/Deposit (%)", row=4, col=1)
+    
 
     return fig
 
@@ -339,27 +343,7 @@ class LoopDashboard:
         walktree_change_values(child)
         
     # walktree_change_values(self.spread_section)
-    walktree_change_values(self.header_bottom)
-  
-  def suggest_params(self, start_on_zero=False, trials=100):
-    from scontrol.dashboard.optimizer import ModelOptimizer
-    contract = self.contracts[self.timeseries_tabs.selected_index]
-    self.optimizer = ModelOptimizer(self.model, self.params, fixed_keys=["token", "data"], maturity=contract, side="pay")
-    
-    if start_on_zero:
-      initial_guess = self.optimizer.get_a_zero_guess()
-    else:
-      initial_guess = self.model_params.copy()
-    
-    initial_guess["token"] = self.params["token"]
-    initial_guess["data"] = self.params["token"]
-    
-    best_params = self.optimizer.optimize(n_trials=100, initial_guess=initial_guess, verbose=False)
-    
-    self.register_new_params(best_params)
-    return best_params
-      
-    
+    walktree_change_values(self.header_bottom)  
 
       
   def display(self):
