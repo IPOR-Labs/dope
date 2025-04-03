@@ -32,3 +32,6 @@ For a simple backtest example look at [[Tutorial] Simple Backtest.ipynb](https:/
 pip install -e .
 ```
 
+# Dope Presentation
+
+https://www.youtube.com/watch?v=cvHyZqs4Nt4
