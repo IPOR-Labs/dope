@@ -74,7 +74,7 @@ class ConfidenceBandTrigger(BaseTrigger):
         )  # initialise to empty
         t = t_dn.copy()
         for pair in self.pairs():
-            asset1, asset2 = pair[0], pair[1]
+            asset1, asset2 = str(pair[0]), str(pair[1])  # 2025-02-05
             if t_dn[asset1].notnull().sum() == 0 or t_dn[asset2].notnull().sum() == 0:
                 continue
             t = t_dn.copy().rename(
@@ -217,7 +217,7 @@ class ConfidenceBandTrigger(BaseTrigger):
         )  # initialise to empty
         t = t_dn.copy()
         for pair in self.pairs():
-            asset1, asset2 = pair[0], pair[1]
+            asset1, asset2 = str(pair[0]), str(pair[1])
             if t_dn[asset1].notnull().sum() == 0 or t_dn[asset2].notnull().sum() == 0:
                 continue
             t = t_dn.copy().rename(
