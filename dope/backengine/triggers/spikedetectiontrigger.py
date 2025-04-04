@@ -286,13 +286,15 @@ class SpikeDetectionTrigger(BaseTrigger):
 
                     # If R-squared drops below threshold, mark as deviation point
                     if r_squared < r_squared_threshold and i > 15:  # Ensure we're not at the very beginning
-                        deviation_points.append(i)
+                        deviation_points.append(i)  #  MAU TODO - check deviation points for the array length of the look-forward windows
+                                                    #  - note this is the number of array elements, NOT a datetime interval
                         if len(deviation_points) >= 3:  # Require multiple consistent deviation signals
                             break
 
                 except (RuntimeError, ValueError):
                     # If fit fails, this could indicate a deviation point
-                    deviation_points.append(i)
+                    deviation_points.append(i)   # MAU TODO - check deviation points for the array length of the look-forward windows
+                                                 # - note this is the number of array elements, NOT a datetime interval
 
             # Return first consistent deviation point if found
             if deviation_points and len(deviation_points) >= 3:
