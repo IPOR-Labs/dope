@@ -5,6 +5,39 @@ import pandas as pd
 
 from dope.names.poolname import PoolName
 
+from dataclasses  import dataclass
+
+@dataclass
+class ColumnsTranslation:
+    apyBaseBorrow: str
+    apyBase: str
+    totalSupplyUsd: str
+    totalBorrowUsd: str
+    datetime:str = None
+    utilizationRate: str = None
+    
+    def translate(self, df):
+        df = df.copy()
+        columns={
+            self.apyBaseBorrow:"apyBaseBorrow",
+            self.apyBase:"apyBase",
+            self.totalSupplyUsd:"totalSupplyUsd",
+            self.totalBorrowUsd:"totalBorrowUsd"
+        }
+        if self.utilizationRate is not None:
+            columns[self.utilizationRate] = "utilizationRate"
+        
+        if (self.datetime == "index") or (self.datetime is None):
+            # if datetime is not passed, we assume it is the index
+            df = df.rename_axis("datetime")
+        else:
+            columns[self.datetime] = "datetime"
+        df = df.rename(columns=columns)
+        if self.utilizationRate is None:
+            df["utilizationRate"] = df["totalBorrowUsd"] / df["totalSupplyUsd"]
+        df.sort_index(inplace=True, ascending=True)
+        return df
+
 
 class BacktestData:
 
@@ -286,6 +319,12 @@ class DataCollection:
             collection[mkt].index = pd.to_datetime(collection[mkt].index)
         return cls(name=name, collection=collection)
 
+    def translate(self, translation: ColumnsTranslation, inplace=False):
+        this = self if inplace else self.copy()
+        for mkt in this.collection.keys():
+            this.collection[mkt] = translation.translate(this.collection[mkt])
+        return this
+
 
 class PriceRow:
     def __init__(self, row):
@@ -324,7 +363,7 @@ class PriceCollection(DataCollection):
         )
         self._price["dollar"] = 1
         warnings.simplefilter("default")
-        self._price["date"] = pd.to_datetime(self._price.reset_index().date.dt.date)
+        self._price["date"] = pd.to_datetime(self._price["date"].dt.date)
         self._price = self._price.groupby("date").mean()
         self._price = self._price.apply(lambda x: x/self._price[self.base_token_name])
         return self._price
