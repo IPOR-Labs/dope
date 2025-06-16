@@ -14,6 +14,10 @@ class Llama:
         self.pools = pd.DataFrame(requests.get(url).json()["data"])
         return self.pools
 
+    def pools_borrow(self):
+        url = "https://yields.llama.fi/yields/poolsBorrow"
+        return pd.DataFrame(requests.get(url).json()["data"])
+
     def lend_rate(self, pool_id):
         url = f"https://yields.llama.fi/chart/{pool_id}"
         result = requests.get(url)

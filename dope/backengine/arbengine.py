@@ -20,45 +20,85 @@ class TokenPortfolio:
                 )
 
     def capital(self):
-        # #print("@Capital()")
+        # print("@Capital()")
         # print(self.allocation)
         # print(self.allocation.values())
         # print(sum(self.allocation.values()))
         # print("Done with capital()")
         return sum(self.allocation.values())
+    
+    def deposit_capital(self):
+        return sum(capital for capital in self.allocation.values() if capital > 0)
+    
+    def debt_capital(self):
+        return sum(abs(capital) for capital in self.allocation.values() if capital < 0)
 
     def weights(self):
-        total = self.capital()
+        total_capital = self.capital()
         return {
-            protocol: capital / total for protocol, capital in self.allocation.items()
+            protocol: capital / total_capital
+            for protocol, capital in self.allocation.items() if capital != 0
         }
 
     def rebalance(self, new_weights, capital=None):
-        _capital = capital or self.capital()
+        
+        capital = capital or self.capital()
         # print(f"{_capital = :,} ")
+        # print(f"{new_weights = }")
 
         for protocol, weight in new_weights.items():
-            self.allocation[protocol] = weight * _capital
+            if weight > 0:
+                self.allocation[protocol] = weight * capital
+            else:
+                self.allocation[protocol] = weight * capital
 
         # remove the ones not allocated anymore (in case zero weights disapear)
+        to_delete = []
         for protocol in list(self.allocation.keys()):
             if protocol not in new_weights:
-                self.allocation[protocol] = 0
+                to_delete.append(protocol)
+                # self.allocation[protocol] = 0
+
+        for protocol in to_delete:
+            del self.allocation[protocol]
+        
+        # print(f"{self.allocation = }")
+
+
+class AnyDict:
+    def __init__(self, value):
+        self.value = value
+    
+    def __getitem__(self, _):
+        return self.value
 
 
 class ArbBacktester:
 
-    def __init__(self, strategy, borrow_lend_data, data, mkt_impact=None, tokens=None):
+    def __init__(
+        self,
+        strategy,
+        data,
+        borrow_lend_data=None,
+        mkt_impact=None,
+        tokens=None,
+        mkt_impact_mode="past",
+    ):
         self.strategy = strategy
         self.data = data
-        self.borrow_lend_data = borrow_lend_data
-        if mkt_impact is None:
-            mkt_impact = {
-                mkt: NeighborhoodMktImpactModel(past_window_days=7, future_window_days=3)
-                for data in self.data.values()
-                for mkt in data.keys()
-            }
-            mkt_impact["cash"] = NeighborhoodMktImpactModel(past_window_days=7, future_window_days=3)
+        self.data_blocks = {token: data.as_block(token) for token in data.keys()}
+        if borrow_lend_data is None:
+            self.borrow_lend_data = self.data
+        else:
+            self.borrow_lend_data = borrow_lend_data
+        if mkt_impact_mode == "past":
+            mkt_impact = {token: {mkt:NeighborhoodMktImpactModel() for mkt in data.keys()} for token, data in self.data.items()}
+        elif mkt_impact_mode == "linear":
+            mkt_impact = {token: {mkt:LinearMktImpactModel() for mkt in data.keys()} for token, data in self.data.items()} 
+        elif mkt_impact_mode == "zero":
+            mkt_impact = AnyDict(AnyDict(LinearMktImpactModel.zero_instance()))
+        else:
+            assert mkt_impact is not None, "mkt_impact must be provided if mkt_impact_mode is not 'past', 'linear', or 'zero'"
         self.mkt_impact = mkt_impact
         self.dates = self.get_dates()
         self.summary = None
@@ -82,13 +122,18 @@ class ArbBacktester:
     def get_capital(self, token):
         return self.πs[token].capital()
 
+    def block_data_up_to_now(self, token, date_ix):
+        block = self.data_blocks[token]
+        block = block[block.index <= date_ix]
+        return block
+
     def prep(self):
         self.strategy.register_engine(self)
 
         self.data.add_cash_mkt()
         for _token in self.data.keys():
             for mkt in self.data[_token].keys():
-                self.mkt_impact[mkt].set_data_ref(self.data[_token][mkt])
+                self.mkt_impact[_token][mkt].set_data_ref(self.data[_token][mkt])
 
     def __call__(self, start_timestamp=None, end_timestamp=None):
         if start_timestamp is not None:
@@ -113,21 +158,17 @@ class ArbBacktester:
                 print(f"{i:>10,}/{_days:>10,}", end="\r")
             date_prev = self.dates[i]
             date_now = self.dates[i + 1]
+            self.date_now = date_now
 
             if date_now < start_timestamp:
                 continue
             if date_now >= end_timestamp:
                 break
-            # print("@", date_now)
 
-            # print(date_now)
-            # The agent does not know the future.
-            # print(date_now)
-            
             if not started:
                 self.strategy.on_start(date_now)
                 started = True
-
+            
             # Step 1: Position gets Accrued:
             for token, π in self.πs.items():
                 r_breakdown = {}
@@ -149,7 +190,7 @@ class ArbBacktester:
                         assert (
                             side_name != "apyBaseBorrow"
                         ), "Cannot Borrow from own wallet."
-                    impacts[mkt] = self.mkt_impact[mkt].impact(
+                    impacts[mkt] = self.mkt_impact[token][mkt].impact(
                         date_now, π.allocation.get(mkt, 0), is_borrow=is_borrow
                     )
                     # _rate_now = df[_filter][side_name].iloc[-1]
@@ -159,13 +200,15 @@ class ArbBacktester:
                         _rate = df[_filter][side_name].iloc[-1] + impacts[mkt]
                     if not np.isfinite(_rate):
                         continue
-                    # print(mkt,"_rate", _rate, df[_filter][side_name].iloc[-1], impacts[mkt], π.allocation.get(mkt, 0) )
+                    # if is_print:
+                    #     print(mkt,side_name , "_rate", _rate, df[_filter][side_name].iloc[-1], impacts[mkt], π.allocation.get(mkt, 0) )
                     r_breakdown[mkt] = max(0, _rate)
 
                 π.compound(
                     r_breakdown,
                     dt=(date_now - date_prev).total_seconds() / 365 / 24 / 3600,
                 )
+                raw_r_breakdown = r_breakdown.copy()
                 for mkt in r_breakdown.keys():
                     r_breakdown[mkt] = ws_before.get(mkt, 0) * r_breakdown[mkt]
                 if len(π) > 0:
@@ -180,6 +223,7 @@ class ArbBacktester:
                             sum(r_breakdown.values()),
                             π.capital(),
                             r_breakdown,
+                            raw_r_breakdown,
                             impacts,
                         ]
                     )
@@ -199,12 +243,12 @@ class ArbBacktester:
 
             # step 3: Rebalance
             for token, _ws in ws.items():
-                # print(">", self.πs[token].allocation)
+                #print(">", self.πs[token].allocation)
                 if len(self.πs[token]) == 0:
                     self.πs[token].rebalance(_ws, self.strategy.capital)
                 else:
                     self.πs[token].rebalance(_ws, None)
-                # print("<", self.πs[token].allocation)
+                #print("<", self.πs[token].allocation)
 
             # print()
             # print("π:::::",π.allocation)
@@ -217,6 +261,7 @@ class ArbBacktester:
                 "rate",
                 "capital",
                 "breakdown",
+                "raw_breakdown",
                 "mkt_impact",
             ],
         )

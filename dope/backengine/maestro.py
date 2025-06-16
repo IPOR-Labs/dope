@@ -271,6 +271,7 @@ class BackEngineMaestro:
             "wrapped-steth": "747c1d2a-c668-4682-b9f9-296708a3dd90", # wstETH
             "coinbase-wrapped-staked-eth": "0f45d730-b279-4629-8e11-ccb5cc3038b4", # cbETH
             "rocket-pool-eth": "d4b3c522-6127-4b89-bedf-83641cdcd2eb", # rETH
+            "restaked-swell-eth": "eff9b43c-a80d-4bfc-9f9e-55e02a8ef619", # rswETH
         }
 
         for p in pools:
