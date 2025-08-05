@@ -14,7 +14,7 @@ class ArbStrategy:
         self.capital = capital
         self.profitability_threshold = profitability_threshold
         self.past_window_in_minutes = past_window_in_minutes
-        self.triggers = triggers if triggers is not None else []
+        self.triggers = triggers
         self.token = token
         self.engine = None
         
@@ -35,7 +35,6 @@ class ArbStrategy:
         if self.triggers is not None:
             if date_ix not in self.triggers:
                 return self.ws
-
         self.now_data = self.engine.block_data_up_to_now(self.token, date_ix)
         
         
