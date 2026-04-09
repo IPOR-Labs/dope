@@ -2,7 +2,7 @@
 
 # Introduction
 
-Dope is a backtesting engine for DeFi, focusing on lending markets and yield protocols. 
+Dope is a backtesting engine for DeFi, focusing on lending markets, yield protocols and RWAs.
 
 [![dope](./images/dope.png)](https://github.com/IPOR-Labs/dope)
 
@@ -19,6 +19,11 @@ Some of the common use cases of Dope are:
 - Analyzing backtest results and comparing them with your existing portfolio:
     - Portfolio Optimization tools
 
+# RWA
+
+`Dope` supports RWA pricing.
+
+See this notebook for a few examples: [notebooks/RWA Pricer Examples.ipynb](https://github.com/IPOR-Labs/dope/blob/main/notebooks/RWA%20Pricer%20Examples.ipynb)
 
 # Where to start
 
