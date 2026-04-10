@@ -19,13 +19,15 @@ Some of the common use cases of Dope are:
 - Analyzing backtest results and comparing them with your existing portfolio:
     - Portfolio Optimization tools
 
-# RWA
+# real World Assets (RWAs) Pricing
 
 `Dope` supports RWA pricing.
 
 See this notebook for a few examples: [notebooks/RWA Pricer Examples.ipynb](https://github.com/IPOR-Labs/dope/blob/main/notebooks/RWA%20Pricer%20Examples.ipynb)
 
-# Where to start
+See whitepaper here: [research/rwa-pricer.pdf](https://github.com/IPOR-Labs/dope/blob/main/research/rwa-pricer.pd)
+
+# Backtesting and Yield Optimization
 
 Look at the [notebooks](https://github.com/IPOR-Labs/dope/tree/main/notebooks) folder for a few tutorials.
 
