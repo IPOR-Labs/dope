@@ -60,8 +60,8 @@ class RWA:
             gamma=gamma,
             model="gbm",
             model_params={
-                "mu": -0.0001,
-                "sigma": 0.0015,
+                "mu": -0.0001, # annualized returns
+                "sigma": 0.0015, # annualized volatility
             },
             seed=42,
         )

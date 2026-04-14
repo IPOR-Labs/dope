@@ -5,6 +5,16 @@ from dope.rwa.vars import Vars
 
 class GBMProcess:
     def __init__(self, mu: float, sigma: float):
+        """
+        Geometric Brownian Motion (GBM) process for simulating asset price paths.
+        Parameters
+        ----------
+        mu : float
+            The drift term (annualized return) of the GBM process.
+        sigma : float
+            The volatility term (annualized standard deviation) of the GBM process. Must be non-negative.
+        """
+        
         self.mu = float(mu)
         self.sigma = float(max(sigma, 0.0))
 
